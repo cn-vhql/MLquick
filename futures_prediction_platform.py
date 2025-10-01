@@ -454,6 +454,203 @@ def plot_predictions(y_true, y_pred, title):
     return fig
 
 
+# Future prediction function
+def predict_future_trend(model, df, historical_days, prediction_days, task_type='regression'):
+    """
+    Use trained model to predict future trends
+    :param model: Trained ML model
+    :param df: Original data with technical indicators
+    :param historical_days: Number of historical days for features
+    :param prediction_days: Number of days to predict into future
+    :param task_type: 'regression' or 'classification'
+    :return: DataFrame with predictions and confidence scores
+    """
+    try:
+        df_features = calculate_technical_indicators(df)
+
+        # Get the most recent data for prediction
+        latest_data = df_features.tail(historical_days).copy()
+
+        # Check if we have enough data
+        if len(latest_data) < historical_days:
+            raise ValueError(f"Insufficient historical data: need {historical_days} days, got {len(latest_data)}")
+
+        # Prepare features for prediction
+        features = []
+
+        # Historical prices and volumes
+        features.extend(latest_data['close'].fillna(0).values)
+        features.extend(latest_data['volume'].fillna(0).values)
+
+        # Technical indicators (last 5 values) - handle NaN values
+        features.extend(latest_data['MA5'].fillna(0).values[-5:])
+        features.extend(latest_data['MA10'].fillna(0).values[-5:])
+        features.extend(latest_data['RSI'].fillna(50).values[-5:])  # RSI default 50
+        features.extend(latest_data['MACD'].fillna(0).values[-5:])
+
+        # Current price
+        current_price = latest_data['close'].iloc[-1]
+        features.append(current_price)
+
+        # Convert to DataFrame
+        feature_names = []
+        for i in range(historical_days):
+            feature_names.extend([f'close_{i}', f'volume_{i}'])
+        feature_names.extend([f'MA5_{i}' for i in range(5)])
+        feature_names.extend([f'MA10_{i}' for i in range(5)])
+        feature_names.extend([f'RSI_{i}' for i in range(5)])
+        feature_names.extend([f'MACD_{i}' for i in range(5)])
+        feature_names.append('current_price')
+
+        X_pred = pd.DataFrame([features], columns=feature_names)
+
+        # Handle any remaining NaN values
+        X_pred = X_pred.fillna(0)
+
+    except Exception as e:
+        raise ValueError(f"Error preparing prediction features: {str(e)}")
+
+    # Make prediction
+    if task_type == 'regression':
+        predicted_change = model.predict(X_pred)[0]
+        predicted_prices = []
+        confidence_intervals = []
+
+        # Calculate predicted prices for each future day
+        for day in range(1, prediction_days + 1):
+            # Assume compound growth based on predicted daily change
+            daily_change = predicted_change / prediction_days
+            predicted_price = current_price * (1 + daily_change / 100) ** day
+            predicted_prices.append(predicted_price)
+
+            # Simple confidence interval (±20% of predicted change)
+            margin = abs(predicted_change) * 0.2 * (day / prediction_days)
+            confidence_intervals.append([predicted_price - margin, predicted_price + margin])
+
+        # Create prediction results DataFrame
+        future_dates = [latest_data['date'].iloc[-1] + timedelta(days=i) for i in range(1, prediction_days + 1)]
+
+        results = pd.DataFrame({
+            'date': future_dates,
+            'predicted_price': predicted_prices,
+            'confidence_lower': [ci[0] for ci in confidence_intervals],
+            'confidence_upper': [ci[1] for ci in confidence_intervals],
+            'predicted_change_pct': [((p - current_price) / current_price * 100) for p in predicted_prices]
+        })
+
+    else:  # classification
+        predicted_class = model.predict(X_pred)[0]
+        class_probabilities = model.predict_proba(X_pred)[0] if hasattr(model, 'predict_proba') else [1.0, 0.0, 0.0]
+
+        # Map class to trend
+        class_names = {0: 'Down', 1: 'Sideways', 2: 'Up'}
+        predicted_trend = class_names.get(predicted_class, 'Unknown')
+        confidence = max(class_probabilities) * 100
+
+        # For classification, create simple trend projection
+        future_dates = [latest_data['date'].iloc[-1] + timedelta(days=i) for i in range(1, prediction_days + 1)]
+        predicted_prices = []
+
+        # Calculate trend-based price projection
+        if predicted_class == 2:  # Up
+            daily_change = 0.5  # 0.5% per day
+        elif predicted_class == 0:  # Down
+            daily_change = -0.5  # -0.5% per day
+        else:  # Sideways
+            daily_change = 0.0  # No change
+
+        for day in range(1, prediction_days + 1):
+            predicted_price = current_price * (1 + daily_change / 100) ** day
+            predicted_prices.append(predicted_price)
+
+        results = pd.DataFrame({
+            'date': future_dates,
+            'predicted_price': predicted_prices,
+            'predicted_trend': [predicted_trend] * prediction_days,
+            'confidence': [confidence] * prediction_days,
+            'predicted_change_pct': [((p - current_price) / current_price * 100) for p in predicted_prices]
+        })
+
+    return results, current_price
+
+
+# Generate prediction report
+def generate_prediction_report(prediction_results, current_price, task_type, symbol, prediction_days):
+    """Generate a comprehensive prediction report"""
+
+    report_lines = []
+    report_lines.append("=" * 60)
+    report_lines.append(f"🔮 FUTURES PREDICTION REPORT")
+    report_lines.append("=" * 60)
+    report_lines.append(f"Contract: {symbol}")
+    report_lines.append(f"Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report_lines.append(f"Current Price: {current_price:.2f}")
+    report_lines.append(f"Prediction Period: {prediction_days} days")
+    report_lines.append(f"Prediction Type: {task_type.title()}")
+    report_lines.append("")
+
+    if task_type == 'regression':
+        final_prediction = prediction_results['predicted_price'].iloc[-1]
+        total_change = prediction_results['predicted_change_pct'].iloc[-1]
+
+        report_lines.append("📈 PREDICTION RESULTS:")
+        report_lines.append(f"Target Price (Day {prediction_days}): {final_prediction:.2f}")
+        report_lines.append(f"Expected Change: {total_change:+.2f}%")
+        report_lines.append("")
+
+        # Confidence intervals
+        final_lower = prediction_results['confidence_lower'].iloc[-1]
+        final_upper = prediction_results['confidence_upper'].iloc[-1]
+        report_lines.append("📊 CONFIDENCE INTERVAL:")
+        report_lines.append(f"Lower Bound: {final_lower:.2f}")
+        report_lines.append(f"Upper Bound: {final_upper:.2f}")
+        report_lines.append("")
+
+        # Daily breakdown
+        report_lines.append("📅 DAILY PROJECTIONS:")
+        for _, row in prediction_results.iterrows():
+            date_str = row['date'].strftime('%Y-%m-%d')
+            price = row['predicted_price']
+            change = row['predicted_change_pct']
+            lower = row['confidence_lower']
+            upper = row['confidence_upper']
+
+            report_lines.append(f"{date_str}: {price:.2f} ({change:+.2f}%)")
+            report_lines.append(f"  Confidence: [{lower:.2f} - {upper:.2f}]")
+
+    else:  # classification
+        predicted_trend = prediction_results['predicted_trend'].iloc[0]
+        confidence = prediction_results['confidence'].iloc[0]
+        final_prediction = prediction_results['predicted_price'].iloc[-1]
+        total_change = prediction_results['predicted_change_pct'].iloc[-1]
+
+        report_lines.append("📈 PREDICTION RESULTS:")
+        report_lines.append(f"Predicted Trend: {predicted_trend}")
+        report_lines.append(f"Confidence Level: {confidence:.1f}%")
+        report_lines.append(f"Target Price (Day {prediction_days}): {final_prediction:.2f}")
+        report_lines.append(f"Expected Change: {total_change:+.2f}%")
+        report_lines.append("")
+
+        # Daily breakdown
+        report_lines.append("📅 DAILY PROJECTIONS:")
+        for _, row in prediction_results.iterrows():
+            date_str = row['date'].strftime('%Y-%m-%d')
+            price = row['predicted_price']
+            change = row['predicted_change_pct']
+
+            report_lines.append(f"{date_str}: {price:.2f} ({change:+.2f}%)")
+
+    report_lines.append("")
+    report_lines.append("⚠️  DISCLAIMER:")
+    report_lines.append("This prediction is based on historical data and machine learning models.")
+    report_lines.append("It should not be considered as financial advice.")
+    report_lines.append("Market conditions can change rapidly and past performance")
+    report_lines.append("does not guarantee future results.")
+    report_lines.append("=" * 60)
+
+    return "\n".join(report_lines)
+
+
 # ============================================================================
 # STREAMLIT INTERFACE
 # ============================================================================
@@ -585,12 +782,13 @@ def main():
                 return
 
             # Create main analysis workflow tabs
-            main_tab1, main_tab2, main_tab3, main_tab4, main_tab5 = st.tabs([
+            main_tab1, main_tab2, main_tab3, main_tab4, main_tab5, main_tab6 = st.tabs([
                 "📊 Raw Data",
                 "📈 Price Charts",
                 "🔧 Feature Engineering",
                 "🤖 Model Training & Prediction",
-                "📊 Feature Importance"
+                "📊 Feature Importance",
+                "🔮 Future Prediction Report"
             ])
 
             with main_tab1:
@@ -729,6 +927,9 @@ def main():
                         st.warning("Target variable classes are imbalanced, which may affect classification performance")
 
             with main_tab4:
+                # Initialize best_model for future prediction tab
+                best_model = None
+
                 # Check if data is sufficient
                 if len(X) < 10:
                     st.error(f"❌ Insufficient data samples ({len(X)} available), please increase data retrieval days or reduce historical data days")
@@ -970,6 +1171,104 @@ def main():
                     st.write("2. Model training completed")
                     st.write("3. Model supports feature importance analysis (e.g., Random Forest, Gradient Boosting)")
                     st.write("4. Linear models (e.g., Linear Regression, Logistic Regression) do not support this feature")
+
+            with main_tab6:
+                st.subheader("🔮 Future Prediction Report")
+
+                # Simple test version first
+                st.write("🔮 Future Prediction Tab Loaded Successfully")
+
+                # Check if model training was completed
+                if 'X' not in locals():
+                    st.error("❌ Data not loaded. Please run the analysis first.")
+                    st.stop()
+                elif len(X) < 10:
+                    st.error(f"❌ Insufficient data samples ({len(X)} available), please increase data retrieval days or reduce historical data days")
+                    st.stop()
+                elif 'best_model' not in locals() or best_model is None:
+                    st.warning("⚠️ Please complete model training in the 'Model Training & Prediction' tab first")
+                    st.info("💡 Train the model by going to the '🤖 Model Training & Prediction' tab and running the analysis")
+                    st.stop()
+                else:
+                    st.success("✅ All requirements met - Ready for prediction!")
+
+                    # Simple prediction controls
+                    st.write("**Basic Configuration:**")
+                    future_prediction_days = st.slider(
+                        "Future Prediction Days",
+                        min_value=1,
+                        max_value=7,  # Reduced for testing
+                        value=3,
+                        help="Number of days to predict into the future"
+                    )
+
+                    # Generate predictions
+                    if st.button("🧪 Test Simple Prediction", key="test_pred"):
+                        st.write("🔄 Starting simple prediction test...")
+
+                        try:
+                            # Simple test prediction
+                            current_price = df['close'].iloc[-1]
+
+                            # Create simple mock prediction results for testing
+                            future_dates = [df['date'].iloc[-1] + timedelta(days=i) for i in range(1, future_prediction_days + 1)]
+
+                            # Simple linear projection
+                            daily_change = 0.5  # 0.5% per day
+                            predicted_prices = []
+                            for day in range(1, future_prediction_days + 1):
+                                price = current_price * (1 + daily_change / 100) ** day
+                                predicted_prices.append(price)
+
+                            simple_results = pd.DataFrame({
+                                'date': future_dates,
+                                'predicted_price': predicted_prices,
+                                'predicted_change_pct': [((p - current_price) / current_price * 100) for p in predicted_prices]
+                            })
+
+                            st.success("✅ Simple prediction test successful!")
+                            st.dataframe(simple_results)
+
+                            # Simple chart
+                            fig, ax = plt.subplots(figsize=(10, 5))
+
+                            # Historical data
+                            hist_data = df.tail(10)
+                            ax.plot(hist_data['date'], hist_data['close'], 'b-', label='Historical')
+
+                            # Predictions
+                            ax.plot(simple_results['date'], simple_results['predicted_price'], 'r--', label='Predicted')
+
+                            ax.set_title('Simple Prediction Test')
+                            ax.legend()
+                            plt.xticks(rotation=45)
+                            st.pyplot(fig)
+                            plt.close(fig)
+
+                        except Exception as e:
+                            st.error(f"❌ Simple prediction failed: {str(e)}")
+                            st.write("Error details:", str(e))
+
+                    # Full prediction button
+                    if st.button("🚀 Generate Full Future Predictions", key="full_pred"):
+                        st.write("🔄 Starting full prediction process...")
+
+                        try:
+                            with st.spinner("Generating predictions..."):
+                                # Call the actual prediction function
+                                prediction_results, current_price = predict_future_trend(
+                                    best_model, df, historical_days, future_prediction_days, task
+                                )
+
+                            st.success("✅ Full predictions generated successfully!")
+                            st.dataframe(prediction_results)
+
+                        except Exception as e:
+                            st.error(f"❌ Full prediction failed: {str(e)}")
+                            st.write("Error details:", str(e))
+                            import traceback
+                            st.write("Full traceback:")
+                            st.code(traceback.format_exc())
 
 if __name__ == "__main__":
     main()
