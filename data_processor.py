@@ -69,6 +69,50 @@ def calculate_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # 波动率
     df_processed['volatility'] = df_processed['close'].rolling(window=10).std()
 
+    # === 新增技术指标 ===
+
+    # 1. 威廉指标 %R (Williams %R)
+    high_14 = df_processed['high'].rolling(window=14).max()
+    low_14 = df_processed['low'].rolling(window=14).min()
+    df_processed['Williams_R'] = ((high_14 - df_processed['close']) / (high_14 - low_14)) * -100
+
+    # 2. 随机指标 KDJ
+    low_9 = df_processed['low'].rolling(window=9).min()
+    high_9 = df_processed['high'].rolling(window=9).max()
+    rsv = (df_processed['close'] - low_9) / (high_9 - low_9) * 100
+    df_processed['K_value'] = rsv.ewm(com=2).mean()
+    df_processed['D_value'] = df_processed['K_value'].ewm(com=2).mean()
+    df_processed['J_value'] = 3 * df_processed['K_value'] - 2 * df_processed['D_value']
+
+    # 3. 动量指标 (Momentum)
+    df_processed['momentum'] = df_processed['close'] / df_processed['close'].shift(10) - 1
+
+    # 4. 价格加速指标 (Price Acceleration)
+    df_processed['price_acceleration'] = df_processed['close'].pct_change().diff()
+
+    # 5. 成交量加权平均价 (VWAP)
+    typical_price = (df_processed['high'] + df_processed['low'] + df_processed['close']) / 3
+    vwap = (typical_price * df_processed['volume']).rolling(window=20).sum() / df_processed['volume'].rolling(window=20).sum()
+    df_processed['VWAP'] = vwap
+
+    # 6. 平均真实波幅 (ATR)
+    high_low = df_processed['high'] - df_processed['low']
+    high_close = abs(df_processed['high'] - df_processed['close'].shift())
+    low_close = abs(df_processed['low'] - df_processed['close'].shift())
+    true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+    df_processed['ATR'] = true_range.rolling(window=14).mean()
+
+    # 7. 商品通道指数 (CCI)
+    tp = (df_processed['high'] + df_processed['low'] + df_processed['close']) / 3
+    sma_tp = tp.rolling(window=20).mean()
+    mad = tp.rolling(window=20).apply(lambda x: np.mean(np.abs(x - x.mean())))
+    df_processed['CCI'] = (tp - sma_tp) / (0.015 * mad)
+
+    # 8. 能量潮指标 (OBV)
+    obv = np.where(df_processed['close'] > df_processed['close'].shift(), df_processed['volume'],
+                  np.where(df_processed['close'] < df_processed['close'].shift(), -df_processed['volume'], 0)).cumsum()
+    df_processed['OBV'] = obv
+
     # 处理无穷大值
     df_processed = df_processed.replace([np.inf, -np.inf], np.nan)
 
@@ -113,6 +157,15 @@ def create_features_targets(df: pd.DataFrame, historical_days: int = 7,
         if feature in df.columns:
             feature_columns.append(feature)
 
+    # 添加新的技术指标特征
+    new_features = [
+        'Williams_R', 'K_value', 'D_value', 'J_value', 'momentum',
+        'price_acceleration', 'VWAP', 'ATR', 'CCI', 'OBV'
+    ]
+    for feature in new_features:
+        if feature in df.columns:
+            feature_columns.append(feature)
+
     # 确保所有特征列都存在
     available_features = [col for col in feature_columns if col in df.columns]
 
@@ -150,9 +203,9 @@ def create_features_targets(df: pd.DataFrame, historical_days: int = 7,
             future_price = future_data.iloc[-1]['close']
             price_change_pct = ((future_price - current_price) / current_price) * 100
 
-            if price_change_pct > 1:
+            if price_change_pct > 0.1:
                 target = 2  # 上涨
-            elif price_change_pct < -1:
+            elif price_change_pct < -0.1:
                 target = 0  # 下跌
             else:
                 target = 1  # 震荡

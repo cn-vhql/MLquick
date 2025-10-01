@@ -140,7 +140,14 @@ class ModelEvaluator:
 
         # 获取类别名称
         unique_labels = np.unique(np.concatenate([y_test, y_pred]))
-        class_names = ['Down', 'Sideways', 'Up'] if len(unique_labels) == 3 else ['Class_0', 'Class_1']
+
+        # 根据实际类别数量设置类别名称
+        if len(unique_labels) == 3:
+            class_names = ['Down', 'Sideways', 'Up']
+        elif len(unique_labels) == 2:
+            class_names = ['Down', 'Up']  # 只有2个类别时，通常是下跌和上涨
+        else:
+            class_names = [f'Class_{i}' for i in range(len(unique_labels))]
 
         return {
             'accuracy': accuracy_score(y_test, y_pred),

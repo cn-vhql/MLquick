@@ -67,6 +67,7 @@ def predict_future_trend(model: Any, df: pd.DataFrame, historical_days: int = 7,
 
         # 逐步预测
         temp_df = df_processed.copy()
+        base_date = temp_df.index[-1]  # 获取基准日期
 
         for day in range(prediction_days):
             # 获取最新的历史数据
@@ -86,9 +87,8 @@ def predict_future_trend(model: Any, df: pd.DataFrame, historical_days: int = 7,
 
             prediction_features.append(prediction)
 
-            # 计算预测日期
-            last_date = temp_df.index[-1]
-            future_date = last_date + timedelta(days=1)
+            # 计算预测日期 - 基于基准日期累加
+            future_date = base_date + timedelta(days=day + 1)
             dates.append(future_date)
 
             # 更新temp_df，添加预测的数据点
@@ -115,7 +115,7 @@ def predict_future_trend(model: Any, df: pd.DataFrame, historical_days: int = 7,
                 'volume': temp_df['volume'].tail(5).mean()  # 使用最近5天平均成交量
             }
 
-            # 添加到temp_df
+            # 添加到temp_df - 使用正确的预测日期
             new_row_df = pd.DataFrame([new_row], index=[future_date])
             temp_df = pd.concat([temp_df, new_row_df])
 
@@ -421,22 +421,30 @@ def create_prediction_summary_table(prediction_results: Dict[str, Any]) -> pd.Da
 
     summary_data = []
 
-    for i, (pred, date) in enumerate(zip(predictions, dates)):
-        if task_type == 'regression':
-            predicted_price = current_price * (1 + pred / 100)
-            price_change = predicted_price - current_price
+    if task_type == 'regression':
+        # 回归任务：需要累加计算每日预测价格
+        temp_price = current_price
+        for i, (pred, date) in enumerate(zip(predictions, dates)):
+            # 计算当日预测价格（基于前一日价格）
+            predicted_price = temp_price * (1 + pred / 100)
+            price_change = predicted_price - current_price  # 相对于原始价格的变化
             change_pct = (price_change / current_price) * 100
             direction = "Up" if change_pct > 0 else "Down" if change_pct < 0 else "Sideways"
 
             summary_data.append({
                 '预测天数': i + 1,
                 '日期': date.strftime('%Y-%m-%d'),
-                '预测价格': f"{predicted_price:.2f}",
-                '价格变化': f"{price_change:+.2f}",
-                '变化百分比': f"{change_pct:+.2f}%",
+                '预测价格': predicted_price,
+                '价格变化': price_change,
+                '变化百分比': change_pct,
                 '趋势方向': direction
             })
-        else:
+
+            # 更新温度变量为当日预测价格，用于下一日计算
+            temp_price = predicted_price
+    else:
+        # 分类任务：直接显示趋势预测
+        for i, (pred, date) in enumerate(zip(predictions, dates)):
             trend_names = {0: "Down", 1: "Sideways", 2: "Up"}
             trend_name = trend_names.get(pred, f"未知({pred})")
 

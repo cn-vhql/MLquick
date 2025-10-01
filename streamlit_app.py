@@ -16,7 +16,7 @@ warnings.filterwarnings('ignore')
 
 # Import custom modules
 from data_fetcher import get_futures_data, get_supported_futures_symbols, validate_futures_symbol
-from data_processor import calculate_technical_indicators, validate_data_quality, get_feature_importance_data
+from data_processor import calculate_technical_indicators, validate_data_quality, get_feature_importance_data, create_features_targets
 from model_trainer import train_complete_workflow, plot_model_comparison, plot_prediction_scatter, plot_confusion_matrix, evaluate_model_performance, get_feature_importance_from_model
 from model_predictor import predict_future_trend, plot_prediction_results, generate_prediction_report, create_prediction_summary_table
 
@@ -48,10 +48,10 @@ def plot_matplotlib_candlestick(df, title="Candlestick Chart"):
         df = df.sort_index().reset_index()
         df = df.rename(columns={'index': 'date'})
 
-        # 限制显示最近200天数据以提高性能
-        if len(df) > 200:
-            df = df.tail(200)
-            st.info(f"数据量较大，仅显示最近200天数据")
+        # # 限制显示最近200天数据以提高性能
+        # if len(df) > 200:
+        #     df = df.tail(200)
+        #     st.info(f"数据量较大，仅显示最近200天数据")
 
         # 创建图表
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10),
@@ -98,7 +98,9 @@ def plot_matplotlib_candlestick(df, title="Candlestick Chart"):
         ax1.set_title('Price Trend', fontsize=14)
         ax1.set_ylabel('Price', fontsize=12)
         ax1.grid(True, alpha=0.3)
-        ax1.legend()
+        # 只有当存在图例项时才显示图例
+        if ax1.get_legend_handles_labels()[0]:  # 检查是否有图例项
+            ax1.legend()
 
         # 绘制成交量
         for i in range(len(df)):
@@ -137,7 +139,7 @@ def render_sidebar():
     st.sidebar.title("⚙️ 参数配置")
 
     # 自定义期货代码输入
-    symbol = st.sidebar.text_input("输入自定义期货代码", value="")
+    symbol = st.sidebar.text_input("输入自定义期货代码", value="CF0")
 
     st.sidebar.markdown(f"**当前选择**: {symbol}")
 
@@ -188,25 +190,152 @@ def render_data_preview_tab(df):
     st.header("📊 原始数据")
 
     if df is not None and len(df) > 0:
+        # 添加涨跌幅列
+        df_with_change = df.copy()
+        df_with_change['涨跌幅(%)'] = df_with_change['close'].pct_change() * 100
+        # 第一行的涨跌幅设为0
+        df_with_change.loc[df_with_change.index[0], '涨跌幅(%)'] = 0
+
         # 数据基本信息
         st.subheader("数据基本信息")
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("数据条数", len(df))
+            st.metric("数据条数", len(df_with_change))
         with col2:
-            st.metric("开始日期", df.index.min().strftime('%Y-%m-%d'))
+            st.metric("开始日期", df_with_change.index.min().strftime('%Y-%m-%d'))
         with col3:
-            st.metric("结束日期", df.index.max().strftime('%Y-%m-%d'))
+            st.metric("结束日期", df_with_change.index.max().strftime('%Y-%m-%d'))
         with col4:
-            latest_price = df['close'].iloc[-1]
-            prev_price = df['close'].iloc[-2] if len(df) > 1 else latest_price
+            latest_price = df_with_change['close'].iloc[-1]
+            prev_price = df_with_change['close'].iloc[-2] if len(df_with_change) > 1 else latest_price
             price_change = latest_price - prev_price
             price_change_pct = (price_change / prev_price) * 100 if prev_price != 0 else 0
             st.metric("最新价格", f"{latest_price:.2f}", f"{price_change_pct:+.2f}%")
 
         # 数据预览
-        st.subheader("数据预览")
-        st.dataframe(df)
+        st.subheader("数据预览（包含涨跌幅）")
+        st.dataframe(df_with_change)
+
+        # 涨跌幅统计
+        st.subheader("涨跌幅统计")
+        price_changes = df_with_change['涨跌幅(%)'].dropna()  # 移除第一行的NaN
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            positive_days = (price_changes > 0).sum()
+            st.metric("上涨天数", f"{positive_days}")
+        with col2:
+            negative_days = (price_changes < 0).sum()
+            st.metric("下跌天数", f"{negative_days}")
+        with col3:
+            flat_days = (price_changes == 0).sum()
+            st.metric("平盘天数", f"{flat_days}")
+        with col4:
+            max_change = price_changes.max()
+            min_change = price_changes.min()
+            st.metric("最大涨跌幅", f"{max_change:+.2f}% / {min_change:+.2f}%")
+
+        # 涨跌幅分布图表
+        st.subheader("涨跌幅分布图表")
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+
+        # 直方图
+        n_bins = 30
+        _, bins, patches = ax1.hist(price_changes, bins=n_bins, alpha=0.7,
+                                   color='skyblue', edgecolor='black')
+
+        # 根据涨跌幅设置颜色
+        for i, patch in enumerate(patches):
+            if bins[i] >= 0:
+                patch.set_facecolor('#44BB44')  # 上涨绿色
+            else:
+                patch.set_facecolor('#FF4444')  # 下跌红色
+
+        ax1.axvline(x=0, color='black', linestyle='--', alpha=0.5)
+        ax1.axvline(x=price_changes.mean(), color='orange', linestyle='--',
+                   alpha=0.7, label=f'Mean: {price_changes.mean():.2f}%')
+
+        ax1.set_xlabel('Change (%)')
+        ax1.set_ylabel('Frequency')
+        ax1.set_title('Historical Price Change Distribution')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+
+        # 趋势分布直方图
+        try:
+            # 创建分类特征用于趋势分析
+            df_processed = calculate_technical_indicators(df_with_change)
+            X, y = create_features_targets(df_processed,
+                                         historical_days=7,
+                                         prediction_days=3,
+                                         task_type='classification')
+
+            if len(y) > 0:
+                # 统计各类别数量
+                trend_counts = y.value_counts().sort_index()
+                trend_names = {0: "Down 📉", 1: "Sideways ➡️", 2: "Up 📈"}
+                # 创建映射后的标签
+                trend_labels = [trend_names.get(i, f"Class {i}") for i in trend_counts.index]
+
+                # 绘制柱状图
+                colors = ['#FF4444', '#FFA500', '#44BB44']  # 红、橙、绿
+                bars = ax2.bar(trend_labels, trend_counts.values.astype(float),
+                             color=colors[:len(trend_labels)], alpha=0.7)
+
+                # 添加数值标签
+                for bar in bars:
+                    height = bar.get_height()
+                    ax2.text(bar.get_x() + bar.get_width()/2., height + max(trend_counts.values)*0.01,
+                           f'{int(height)}', ha='center', va='bottom', fontweight='bold')
+
+                ax2.set_xlabel('Trend Type')
+                ax2.set_ylabel('Frequency')
+                ax2.set_title('Trend Distribution Histogram')
+                ax2.grid(True, alpha=0.3, axis='y')
+
+                # 添加百分比标签
+                total_samples = len(y)
+                for i, count in enumerate(trend_counts.values):
+                    percentage = (count / total_samples) * 100
+                    ax2.text(i, count/2, f'{percentage:.1f}%', ha='center', va='center',
+                           color='white', fontweight='bold')
+            else:
+                # 如果无法创建分类特征，显示替代信息
+                ax2.text(0.5, 0.5, 'Insufficient data for trend analysis',
+                        ha='center', va='center', transform=ax2.transAxes, fontsize=12)
+                ax2.set_title('Trend Distribution (Not Available)')
+                ax2.set_xlabel('Trend Type')
+                ax2.set_ylabel('Frequency')
+
+        except Exception as e:
+            # 如果趋势分析失败，显示错误信息
+            ax2.text(0.5, 0.5, f'Trend analysis failed:\n{str(e)}',
+                    ha='center', va='center', transform=ax2.transAxes, fontsize=10)
+            ax2.set_title('Trend Distribution (Error)')
+            ax2.set_xlabel('Trend Type')
+            ax2.set_ylabel('Frequency')
+
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close()
+
+        # # 详细涨跌幅统计表格
+        # st.subheader("详细涨跌幅统计")
+        # stats_data = {
+        #     '总交易日': len(price_changes),
+        #     '平均涨跌幅(%)': f"{price_changes.mean():.3f}",
+        #     '最大涨幅(%)': f"{price_changes.max():.3f}",
+        #     '最大跌幅(%)': f"{price_changes.min():.3f}",
+        #     '标准差(%)': f"{price_changes.std():.3f}",
+        #     '中位数(%)': f"{np.median(price_changes):.3f}",
+        #     '偏度': f"{pd.Series(price_changes).skew():.3f}",
+        #     '峰度': f"{pd.Series(price_changes).kurtosis():.3f}"
+        # }
+
+        # # 转换为DataFrame并横向显示
+        # stats_df = pd.DataFrame([stats_data]).T
+        # stats_df.columns = ['数值']
+        # st.dataframe(stats_df, width='content')
 
         # 数据质量报告
         st.subheader("数据质量报告")
@@ -270,23 +399,173 @@ def render_feature_engineering_tab(df, params):
         processed_df = calculate_technical_indicators(df)
         st.session_state.processed_data = processed_df
 
-        # 技术指标预览
-        st.subheader("技术指标预览")
-        indicator_cols = ['MA5', 'MA10', 'MA20', 'RSI', 'MACD', 'Signal', 'BB_upper', 'BB_middle', 'BB_lower']
-        available_indicators = [col for col in indicator_cols if col in processed_df.columns]
+        # 创建特征和目标变量用于分布分析
+        X, y = create_features_targets(processed_df, historical_days=params['historical_days'],
+                                     prediction_days=params['prediction_days'], task_type=params['task_type'])
 
-        if available_indicators:
-            st.dataframe(processed_df[available_indicators].tail(20))
+        # 显示所有训练特征
+        st.subheader("🎯 All Training Features")
+
+        if len(X) > 0:
+            # 显示特征维度信息
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("总特征数", f"{X.shape[1]}")
+            with col2:
+                st.metric("训练样本数", f"{len(X)}")
+            with col3:
+                st.metric("历史天数", f"{params['historical_days']}")
+
+            # 创建特征类型分组
+            feature_groups = {}
+            base_features = set()
+
+            # 按基础特征分组
+            for feature_name in X.columns:
+                if '_day_' in feature_name:
+                    base_feature = feature_name.split('_day_')[0]
+                    base_features.add(base_feature)
+                    if base_feature not in feature_groups:
+                        feature_groups[base_feature] = []
+                    day_num = feature_name.split('_day_')[1]
+                    feature_groups[base_feature].append((int(day_num), feature_name))
+                else:
+                    # 如果不是时间序列特征，单独归类
+                    if 'Other' not in feature_groups:
+                        feature_groups['Other'] = []
+                    feature_groups['Other'].append((0, feature_name))
+
+            # 按天数字段排序
+            for base_feature in feature_groups:
+                feature_groups[base_feature].sort(key=lambda x: x[0])
+
+            # 显示特征分组信息
+            st.subheader("📊 Feature Categories")
+            categories_info = []
+            for base_feature, features_list in feature_groups.items():
+                categories_info.append({
+                    'Feature Category': base_feature,
+                    'Count': len(features_list),
+                    'Days': f"Day 1 to Day {max([day for day, _ in features_list])}" if len(features_list) > 1 else "Single Day"
+                })
+
+            categories_df = pd.DataFrame(categories_info)
+            st.dataframe(categories_df, width='content')
+
+            # 显示最新样本的所有特征值
+            st.subheader("🔍 Latest Training Sample (All Features)")
+            st.write(f"Showing the most recent training sample with all {X.shape[1]} features:")
+
+            # 获取最新样本并转置显示
+            latest_sample = X.iloc[-1:].T
+            latest_sample.columns = ['Latest Value']
+
+            # 按基础特征分组显示
+            with st.expander("📋 View Features by Category", expanded=True):
+                for base_feature, features_list in feature_groups.items():
+                    st.write(f"**{base_feature}** ({len(features_list)} features)")
+
+                    # 提取该类别的特征
+                    category_features = [feature_name for _, feature_name in features_list]
+                    category_data = latest_sample.loc[category_features]
+
+                    # 格式化显示
+                    display_data = category_data.copy()
+                    display_data['Feature Name'] = display_data.index
+                    display_data = display_data.reset_index(drop=True)
+                    display_data.columns = ['Latest Value', 'Feature Name']
+                    display_data = display_data[['Feature Name', 'Latest Value']]
+
+                    # 添加特征说明
+                    feature_descriptions = {
+                        # 基础价格数据
+                        'open': 'Opening Price',
+                        'high': 'Highest Price',
+                        'low': 'Lowest Price',
+                        'close': 'Closing Price',
+                        'volume': 'Volume',
+
+                        # 移动平均线
+                        'MA5': '5-Day Moving Average',
+                        'MA10': '10-Day Moving Average',
+                        'MA20': '20-Day Moving Average',
+
+                        # 动量指标
+                        'RSI': 'Relative Strength Index (14)',
+                        'MACD': 'MACD Line (12-26)',
+                        'Signal': 'MACD Signal Line (9)',
+                        'Histogram': 'MACD Histogram',
+
+                        # 布林带
+                        'BB_upper': 'Bollinger Band Upper (20±2σ)',
+                        'BB_middle': 'Bollinger Band Middle (20)',
+                        'BB_lower': 'Bollinger Band Lower (20-2σ)',
+
+                        # 价格变化率
+                        'price_change': '1-Day Price Change %',
+                        'price_change_3d': '3-Day Price Change %',
+                        'price_change_5d': '5-Day Price Change %',
+
+                        # 成交量指标
+                        'volume_MA5': '5-Day Volume MA',
+                        'volume_MA10': '10-Day Volume MA',
+                        'volume_ratio': 'Current/5D Volume Ratio',
+
+                        # 价格形态指标
+                        'price_position': 'Price Position in Daily Range',
+                        'volatility': '10-Day Price Volatility',
+
+                        # === 新增技术指标 ===
+                        # 超买超卖指标
+                        'Williams_R': 'Williams %R (14)',
+                        'K_value': 'Stochastic %K (9)',
+                        'D_value': 'Stochastic %D (9)',
+                        'J_value': 'Stochastic %J (9)',
+
+                        # 动量和趋势指标
+                        'momentum': '10-Day Momentum',
+                        'price_acceleration': 'Price Acceleration (2nd derivative)',
+
+                        # 成交量和价格指标
+                        'VWAP': 'Volume Weighted Average Price (20)',
+                        'ATR': 'Average True Range (14)',
+
+                        # 其他指标
+                        'CCI': 'Commodity Channel Index (20)',
+                        'OBV': 'On Balance Volume (cumulative)'
+                    }
+
+                    display_data['Description'] = display_data['Feature Name'].apply(
+                        lambda x: feature_descriptions.get(x.split('_day_')[0], 'Unknown Feature')
+                    )
+
+                    # 显示数据表格
+                    st.dataframe(display_data, width='stretch', use_container_width=True)
+
+                    # 添加分隔线
+                    if base_feature != list(feature_groups.keys())[-1]:
+                        st.markdown("---")
+
+            # 特征统计信息
+            st.subheader("📈 Feature Statistics Summary")
+            feature_stats = X.describe().T
+            feature_stats = feature_stats[['mean', 'std', 'min', 'max', 'count']]
+            feature_stats.columns = ['Mean', 'Std Dev', 'Min', 'Max', 'Count']
+
+            # 按基础特征分组显示统计信息
+            with st.expander("📊 Detailed Feature Statistics", expanded=False):
+                for base_feature, features_list in feature_groups.items():
+                    st.write(f"**{base_feature} Statistics**")
+                    category_features = [feature_name for _, feature_name in features_list]
+                    category_stats = feature_stats.loc[category_features]
+                    st.dataframe(category_stats, width='stretch')
+                    st.markdown("---")
+
         else:
-            st.warning("无法计算技术指标，数据可能不足")
-
-        # 技术指标统计
-        st.subheader("技术指标统计")
-        if available_indicators:
-            st.write(processed_df[available_indicators].describe())
+            st.warning("No training features available. Please check data processing steps.")
 
     else:
-        st.warning("暂无数据，请先获取期货数据")
+        st.warning("No data available, please fetch futures data first")
 
 
 def render_model_training_tab(params):
@@ -326,34 +605,44 @@ def render_model_training_tab(params):
         st.subheader("📊 模型性能对比")
         performance_df = evaluate_model_performance(results['results'], results['task_type'])
         if not performance_df.empty:
-            st.dataframe(performance_df, use_container_width=True)
+            st.dataframe(performance_df, width='stretch')
 
-        # 预测结果可视化
+        # 预测结果可视化 - 使用最佳模型
         if results['task_type'] == 'regression':
-            st.subheader("📈 预测散点图")
-            for model_name, result in results['results'].items():
+            st.subheader("📈 预测散点图 (最佳模型)")
+            best_model_name = results['best_model']
+            if best_model_name and best_model_name in results['results']:
+                result = results['results'][best_model_name]
                 if result is not None:
                     fig = plot_prediction_scatter(
-                        results['y_test'], result['predictions'], model_name
+                        results['y_test'], result['predictions'], best_model_name
                     )
                     if fig:
                         st.pyplot(fig)
                         plt.close()
-                        break  # 只显示最佳模型的图
+                    else:
+                        st.info("最佳模型散点图生成失败")
+            else:
+                st.warning("无法找到最佳模型的预测结果")
         else:
-            st.subheader("🎯 混淆矩阵")
-            for model_name, result in results['results'].items():
+            st.subheader("🎯 混淆矩阵 (最佳模型)")
+            best_model_name = results['best_model']
+            if best_model_name and best_model_name in results['results']:
+                result = results['results'][best_model_name]
                 if result is not None:
                     metrics = result['metrics']
                     fig = plot_confusion_matrix(
                         metrics['confusion_matrix'],
                         metrics['class_names'],
-                        model_name
+                        best_model_name
                     )
                     if fig:
                         st.pyplot(fig)
                         plt.close()
-                        break  # 只显示最佳模型的图
+                    else:
+                        st.info("最佳模型混淆矩阵生成失败")
+            else:
+                st.warning("无法找到最佳模型的预测结果")
 
 
 def render_feature_importance_tab():
@@ -367,17 +656,25 @@ def render_feature_importance_tab():
     results = st.session_state.training_results
 
     if results['best_model'] is not None:
-        # 获取特征重要性
-        feature_names = list(results['X'].columns)
-        importance_df = get_feature_importance_from_model(results['best_model'], feature_names)
+        # 获取最佳模型的实际模型对象
+        best_model_name = results['best_model']
+        if best_model_name in results['results'] and results['results'][best_model_name] is not None:
+            actual_model = results['results'][best_model_name]['model']
+            feature_names = list(results['X'].columns)
+            importance_df = get_feature_importance_from_model(
+                actual_model,
+                feature_names,
+                results['X_test'],
+                results['y_test']
+            )
 
-        if not importance_df.empty:
-            # 按基础特征分组
-            importance_grouped = get_feature_importance_data(results['X'], importance_df['Importance'].values)
+            if not importance_df.empty:
+                # 按基础特征分组
+                importance_grouped = get_feature_importance_data(results['X'], importance_df['Importance'].to_numpy())
 
-            st.subheader("特征重要性排名 (Top 20)")
-            if len(importance_grouped) > 0:
-                st.dataframe(importance_grouped.head(20), use_container_width=True)
+                st.subheader("特征重要性排名 (Top 20)")
+                if len(importance_grouped) > 0:
+                    st.dataframe(importance_grouped.head(20), width='stretch')
 
                 # # 绘制特征重要性图
                 # fig, ax = plt.subplots(figsize=(12, 8))
@@ -457,30 +754,39 @@ def render_future_prediction_tab(params):
         st.subheader("📋 预测摘要")
         current_price = pred_results['current_price']
 
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("当前价格", f"{current_price:.2f}")
-        with col2:
-            if pred_results['task_type'] == 'regression':
+        if pred_results['task_type'] == 'regression':
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("当前价格", f"{current_price:.2f}")
+            with col2:
                 final_prediction = pred_results['predictions'][-1]
                 final_price = current_price * (1 + final_prediction / 100)
+                st.metric("期末价格", f"{final_price:.2f}")
+            with col3:
                 total_change = final_prediction
                 st.metric("预测总变化", f"{total_change:+.2f}%")
-            else:
+            with col4:
+                if pred_results['predictions']:
+                    confidence = min(0.9, max(0.1, 1 - np.std(pred_results['predictions']) / (np.mean(np.abs(pred_results['predictions'])) + 1e-6)))
+                    st.metric("预测置信度", f"{confidence:.2f}")
+        else:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("当前价格", f"{current_price:.2f}")
+            with col2:
                 trend_names = {0: "Down", 1: "Sideways", 2: "Up"}
                 most_common = max(set(pred_results['predictions']), key=pred_results['predictions'].count)
                 st.metric("主要趋势", trend_names.get(most_common, "未知"))
-
-        with col3:
-            if pred_results['predictions']:
-                confidence = min(0.9, max(0.1, 1 - np.std(pred_results['predictions']) / (np.mean(np.abs(pred_results['predictions'])) + 1e-6)))
-                st.metric("预测置信度", f"{confidence:.2f}")
+            with col3:
+                if pred_results['predictions']:
+                    confidence = min(0.9, max(0.1, 1 - np.std(pred_results['predictions']) / (np.mean(np.abs(pred_results['predictions'])) + 1e-6)))
+                    st.metric("预测置信度", f"{confidence:.2f}")
 
         # 预测数据表
         st.subheader("📊 详细预测数据")
         summary_df = create_prediction_summary_table(pred_results)
         if not summary_df.empty:
-            st.dataframe(summary_df, use_container_width=True)
+            st.dataframe(summary_df, width='stretch')
 
         # 可视化预测结果
         st.subheader("📈 预测趋势图")
