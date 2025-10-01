@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score, accuracy_score
+from sklearn.metrics import (mean_squared_error, r2_score, accuracy_score,
+                           classification_report, confusion_matrix)
 import warnings
 warnings.filterwarnings('ignore')
 
-# Attempt to import st_echarts
 
 # Set matplotlib style
 plt.style.use('seaborn-v0_8')
@@ -110,221 +110,6 @@ def plot_matplotlib_candlestick(df, title="Candlestick Chart"):
     except Exception as e:
         st.error(f"matplotlib chart plotting error: {str(e)}")
         return None
-
-# ECharts candlestick chart function
-def plot_echarts_candlestick(df, title="Candlestick Chart"):
-    """Draw professional candlestick chart using ECharts"""
-    # Ensure data is sorted by date
-    df = df.sort_values('date').reset_index(drop=True)
-
-    # Prepare candlestick data
-    kline_data = []
-    for i in range(len(df)):
-        kline_data.append([
-            float(df.iloc[i]['open']),
-            float(df.iloc[i]['close']),
-            float(df.iloc[i]['low']),
-            float(df.iloc[i]['high'])
-        ])
-
-    # Prepare x-axis data (dates)
-    xaxis_data = [df.iloc[i]['date'].strftime('%m-%d') for i in range(len(df))]
-
-    # Prepare volume data
-    volume_data = []
-    for i in range(len(df)):
-        volume_value = int(df.iloc[i]['volume']) if pd.notna(df.iloc[i]['volume']) else 0
-        volume_data.append({
-            'value': volume_value,
-            'itemStyle': {
-                'color': '#ef232a' if df.iloc[i]['close'] > df.iloc[i]['open'] else '#14b143'
-            }
-        })
-
-    # Prepare moving average data
-    series_list = [
-        {
-            'name': 'Candlestick',
-            'type': 'candlestick',
-            'data': kline_data,
-            'xAxisIndex': 0,
-            'yAxisIndex': 0,
-            'itemStyle': {
-                'color': '#ef232a',      # Bullish color (red)
-                'color0': '#14b143',     # Bearish color (green)
-                'borderColor': '#ef232a',
-                'borderColor0': '#14b143'
-            }
-        }
-    ]
-
-    # Add moving averages
-    if 'MA5' in df.columns and not df['MA5'].isnull().all():
-        ma5_data = []
-        for x in df['MA5']:
-            if pd.notna(x):
-                ma5_data.append(float(x))
-            else:
-                ma5_data.append('-')  # Use '-' instead of None
-        series_list.append({
-            'name': 'MA5',
-            'type': 'line',
-            'data': ma5_data,
-            'smooth': True,
-            'lineStyle': {
-                'color': '#3982c4',
-                'width': 1
-            },
-            'xAxisIndex': 0,
-            'yAxisIndex': 0
-        })
-
-    if 'MA10' in df.columns and not df['MA10'].isnull().all():
-        ma10_data = []
-        for x in df['MA10']:
-            if pd.notna(x):
-                ma10_data.append(float(x))
-            else:
-                ma10_data.append('-')  # Use '-' instead of None
-        series_list.append({
-            'name': 'MA10',
-            'type': 'line',
-            'data': ma10_data,
-            'smooth': True,
-            'lineStyle': {
-                'color': '#f67317',
-                'width': 1
-            },
-            'xAxisIndex': 0,
-            'yAxisIndex': 0
-        })
-
-    if 'MA20' in df.columns and not df['MA20'].isnull().all():
-        ma20_data = []
-        for x in df['MA20']:
-            if pd.notna(x):
-                ma20_data.append(float(x))
-            else:
-                ma20_data.append('-')  # Use '-' instead of None
-        series_list.append({
-            'name': 'MA20',
-            'type': 'line',
-            'data': ma20_data,
-            'smooth': True,
-            'lineStyle': {
-                'color': '#8a2be2',
-                'width': 1
-            },
-            'xAxisIndex': 0,
-            'yAxisIndex': 0
-        })
-
-    # Add volume
-    series_list.append({
-        'name': 'Volume',
-        'type': 'bar',
-        'data': volume_data,
-        'xAxisIndex': 1,
-        'yAxisIndex': 1
-    })
-
-    # ECharts configuration
-    option = {
-        'title': {
-            'text': title,
-            'left': 'center',
-            'textStyle': {
-                'fontSize': 16,
-                'fontWeight': 'bold'
-            }
-        },
-        'tooltip': {
-            'trigger': 'axis',
-            'axisPointer': {
-                'type': 'cross'
-            }
-        },
-        'legend': {
-            'data': ['Candlestick', 'MA5', 'MA10', 'MA20', 'Volume'],
-            'top': '8%'
-        },
-        'grid': [
-            {
-                'left': '10%',
-                'right': '8%',
-                'height': '60%',
-                'top': '15%'
-            },
-            {
-                'left': '10%',
-                'right': '8%',
-                'top': '80%',
-                'height': '15%'
-            }
-        ],
-        'xAxis': [
-            {
-                'type': 'category',
-                'data': xaxis_data,
-                'scale': True,
-                'boundaryGap': False,
-                'axisLine': {'onZero': False},
-                'splitLine': {'show': False},
-                'min': 'dataMin',
-                'max': 'dataMax'
-            },
-            {
-                'type': 'category',
-                'gridIndex': 1,
-                'data': xaxis_data,
-                'scale': True,
-                'boundaryGap': False,
-                'axisLine': {'onZero': False},
-                'axisTick': {'show': False},
-                'splitLine': {'show': False},
-                'axisLabel': {'show': False},
-                'min': 'dataMin',
-                'max': 'dataMax'
-            }
-        ],
-        'yAxis': [
-            {
-                'scale': True,
-                'splitArea': {
-                    'show': True
-                }
-            },
-            {
-                'scale': True,
-                'gridIndex': 1,
-                'splitNumber': 2,
-                'axisLabel': {'show': False},
-                'axisLine': {'show': False},
-                'axisTick': {'show': False},
-                'splitLine': {'show': False}
-            }
-        ],
-        'dataZoom': [
-            {
-                'type': 'inside',
-                'xAxisIndex': [0, 1],
-                'start': 50,
-                'end': 100
-            },
-            {
-                'show': True,
-                'xAxisIndex': [0, 1],
-                'type': 'slider',
-                'top': '92%',
-                'start': 50,
-                'end': 100
-            }
-        ],
-        'series': series_list
-    }
-
-    return option
-
 
 
 # Set page configuration
@@ -536,9 +321,9 @@ def create_features_targets(df, historical_days=7, prediction_days=3, task_type=
         else:
             # Classification task: predict up/sideways/down
             price_change = (future_price - current_price) / current_price * 100
-            if price_change > 1.0:  # Price increase > 1%
+            if price_change > 0.5:  # Price increase > 1%
                 target = 2  # Up
-            elif price_change < -1.0:  # Price decrease > 1%
+            elif price_change < -0.5:  # Price decrease > 1%
                 target = 0  # Down
             else:
                 target = 1  # Sideways
@@ -569,15 +354,15 @@ def create_features_targets(df, historical_days=7, prediction_days=3, task_type=
     return X, y
 
 
+# ============================================================================
+# MODEL TRAINING FUNCTIONS
+# ============================================================================
+
 # Regression prediction model
 def regression_prediction(X, y, train_size=0.7):
     """Use multiple regression models for prediction"""
     from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
     from sklearn.linear_model import LinearRegression, Ridge
-    from sklearn.svm import SVR
-    from sklearn.model_selection import train_test_split
-    from sklearn.metrics import mean_squared_error, r2_score
-    import matplotlib.pyplot as plt
 
     # Split training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=train_size, random_state=42)
@@ -614,16 +399,12 @@ def regression_prediction(X, y, train_size=0.7):
 
     return results, best_model, X_test, y_test
 
+
 # Classification prediction model
 def classification_prediction(X, y, train_size=0.7):
     """Use multiple classification models for prediction"""
-    from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, HistGradientBoostingClassifier
+    from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
     from sklearn.linear_model import LogisticRegression
-    from sklearn.svm import SVC
-    from sklearn.neighbors import KNeighborsClassifier
-    from sklearn.model_selection import train_test_split
-    from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-    import seaborn as sns
 
     # Split training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=train_size, random_state=42)
@@ -671,6 +452,11 @@ def plot_predictions(y_true, y_pred, title):
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     return fig
+
+
+# ============================================================================
+# STREAMLIT INTERFACE
+# ============================================================================
 
 # Main interface
 def main():
@@ -812,16 +598,6 @@ def main():
                 st.info(f"Showing the last 10 data records for {selected_future}({futures_symbol})")
                 st.dataframe(df.tail(10), width='stretch')
 
-                # Data basic information
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Data Records", len(df))
-                with col2:
-                    st.metric("Data Columns", len(df.columns))
-                with col3:
-                    if len(df) > 0:
-                        date_range = (df['date'].max() - df['date'].min()).days
-                        st.metric("Time Range", f"{date_range} days")
 
             with main_tab2:
                 st.subheader("📈 Price Charts")
@@ -850,23 +626,6 @@ def main():
                         st.pyplot(fig, use_container_width=True)
                         plt.close(fig)  # Close figure to free memory
 
-                        # Display data summary below chart
-                        with st.expander("📊 View Data Summary", expanded=False):
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                st.metric("Open Price (Latest)", f"{df_chart['open'].iloc[-1]:,.0f}")
-                            with col2:
-                                st.metric("Close Price (Latest)", f"{df_chart['close'].iloc[-1]:,.0f}")
-                            with col3:
-                                change = (df_chart['close'].iloc[-1] - df_chart['open'].iloc[0]) / df_chart['open'].iloc[0] * 100
-                                st.metric("Period Change (%)", f"{change:+.2f}%")
-
-                            st.write("**Last 5 days data:**")
-                            recent_data = df_chart[['date', 'open', 'high', 'low', 'close', 'volume']].tail(5).copy()
-                            recent_data['date'] = recent_data['date'].dt.strftime('%Y-%m-%d')
-                            st.dataframe(recent_data, hide_index=True, width='stretch')
-                    else:
-                        raise Exception("matplotlib chart generation failed")
 
                 except Exception as e:
                     st.error(f"❌ Candlestick chart plotting failed: {str(e)}")
@@ -1076,7 +835,6 @@ def main():
                                 best_name = max(results.keys(), key=lambda x: results[x]['accuracy'])
                                 y_pred = results[best_name]['predictions']
 
-                                from sklearn.metrics import confusion_matrix
                                 cm = confusion_matrix(y_test, y_pred)
                                 fig, ax = plt.subplots(figsize=(8, 6))
                                 sns.heatmap(cm, annot=True, fmt='d', ax=ax, cmap='Blues')
@@ -1100,7 +858,6 @@ def main():
                         with sub_tab3:
                             if best_model is not None:
                                 st.write("**Classification Report:**")
-                                from sklearn.metrics import classification_report
 
                                 # Create target names based on actual classes present
                                 unique_labels = sorted(list(set(y_test) | set(y_pred)))
