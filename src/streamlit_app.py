@@ -19,6 +19,7 @@ from data_fetcher import get_futures_data, get_supported_futures_symbols, valida
 from data_processor import calculate_technical_indicators, validate_data_quality, get_feature_importance_data, create_features_targets
 from model_trainer import train_complete_workflow, plot_model_comparison, plot_prediction_scatter, plot_confusion_matrix, evaluate_model_performance, get_feature_importance_from_model
 from model_predictor import predict_future_trend, plot_prediction_results, generate_prediction_report, create_prediction_summary_table
+from feature_library import feature_library
 
 # Set matplotlib style
 plt.style.use('seaborn-v0_8')
@@ -35,6 +36,13 @@ if 'training_results' not in st.session_state:
     st.session_state.training_results = {}
 if 'best_model' not in st.session_state:
     st.session_state.best_model = None
+if 'feature_config_loaded' not in st.session_state:
+    st.session_state.feature_config_loaded = False
+
+# 加载特征配置
+if not st.session_state.feature_config_loaded:
+    feature_library.load_config()
+    st.session_state.feature_config_loaded = True
 
 
 def plot_matplotlib_candlestick(df, title="Candlestick Chart"):
@@ -265,10 +273,12 @@ def render_data_preview_tab(df):
         try:
             # 创建分类特征用于趋势分析
             df_processed = calculate_technical_indicators(df_with_change)
+            selected_features = feature_library.get_training_features_list()
             X, y = create_features_targets(df_processed,
                                          historical_days=7,
                                          prediction_days=3,
-                                         task_type='classification')
+                                         task_type='classification',
+                                         selected_features=selected_features)
 
             if len(y) > 0:
                 # 统计各类别数量
@@ -400,8 +410,11 @@ def render_feature_engineering_tab(df, params):
         st.session_state.processed_data = processed_df
 
         # 创建特征和目标变量用于分布分析
+        selected_features = feature_library.get_training_features_list()
         X, y = create_features_targets(processed_df, historical_days=params['historical_days'],
-                                     prediction_days=params['prediction_days'], task_type=params['task_type'])
+                                     prediction_days=params['prediction_days'],
+                                     task_type=params['task_type'],
+                                     selected_features=selected_features)
 
         # 显示所有训练特征
         st.subheader("🎯 All Training Features")
@@ -580,12 +593,16 @@ def render_model_training_tab(params):
     if st.button("🚀 开始训练模型", type="primary"):
         with st.spinner("正在训练模型..."):
             try:
+                # 获取选择的特征
+                selected_features = feature_library.get_training_features_list()
+
                 results = train_complete_workflow(
                     st.session_state.processed_data,
                     historical_days=params['historical_days'],
                     prediction_days=params['prediction_days'],
                     task_type=params['task_type'],
-                    train_size=params['train_size']
+                    train_size=params['train_size'],
+                    selected_features=selected_features
                 )
 
                 if results:
@@ -841,9 +858,10 @@ def main():
                 st.error(f"数据获取出错: {str(e)}")
 
     # 主标签页
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "📊 原始数据",
         "📈 价格走势图",
+        "⚙️ 特征配置",
         "🔧 特征工程",
         "🤖 模型训练与预测",
         "📊 特征重要性",
@@ -857,15 +875,18 @@ def main():
         render_price_chart_tab(st.session_state.data)
 
     with tab3:
-        render_feature_engineering_tab(st.session_state.data, params)
+        render_feature_config_tab()
 
     with tab4:
-        render_model_training_tab(params)
+        render_feature_engineering_tab(st.session_state.data, params)
 
     with tab5:
-        render_feature_importance_tab()
+        render_model_training_tab(params)
 
     with tab6:
+        render_feature_importance_tab()
+
+    with tab7:
         render_future_prediction_tab(params)
 
     # 页脚
@@ -878,6 +899,186 @@ def main():
         """,
         unsafe_allow_html=True
     )
+
+
+def render_feature_config_tab():
+    """渲染特征配置标签页"""
+    st.header("⚙️ 特征配置管理")
+
+    # 显示特征库统计信息
+    stats = feature_library.get_summary_stats()
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("总特征数", stats["总特征数"])
+    with col2:
+        st.metric("已启用", stats["已启用特征"])
+    with col3:
+        st.metric("未启用", stats["未启用特征"])
+    with col4:
+        st.metric("启用率", stats["启用率"])
+
+    st.markdown("---")
+
+    # 预设配置
+    st.subheader("🎯 预设配置")
+    presets = feature_library.create_preset_configs()
+    preset_cols = st.columns(len(presets))
+
+    for i, (preset_name, _) in enumerate(presets.items()):
+        with preset_cols[i]:
+            if st.button(preset_name, key=f"preset_{preset_name}"):
+                if feature_library.apply_preset(preset_name):
+                    st.success(f"已应用预设配置：{preset_name}")
+                    st.rerun()
+                else:
+                    st.error(f"应用预设配置失败：{preset_name}")
+
+    st.markdown("---")
+
+    # 按类别显示特征选择
+    st.subheader("🎛️ 自定义特征选择")
+    features_by_category = feature_library.get_features_by_category()
+
+    # 创建两列布局
+    left_col, right_col = st.columns(2)
+
+    with left_col:
+        st.write("**基础数据和价格特征**")
+        basic_categories = ["基础数据", "价格变化", "价格特征"]
+
+        for category in basic_categories:
+            if category in features_by_category:
+                with st.expander(f"{category} ({len(features_by_category[category])}个特征)", expanded=True):
+                    for feature_config in features_by_category[category]:
+                        key = f"feature_{feature_config.name}"
+                        # 使用复选框控制特征启用状态
+                        enabled = st.checkbox(
+                            feature_config.display_name,
+                            value=feature_config.enabled,
+                            key=key,
+                            help=feature_config.description
+                        )
+                        # 更新特征库中的状态
+                        if enabled != feature_config.enabled:
+                            feature_library.set_feature_enabled(feature_config.name, enabled)
+
+    with right_col:
+        st.write("**技术指标和成交量特征**")
+        tech_categories = ["趋势指标", "动量指标", "波动率指标", "成交量指标"]
+
+        for category in tech_categories:
+            if category in features_by_category:
+                with st.expander(f"{category} ({len(features_by_category[category])}个特征)", expanded=False):
+                    for feature_config in features_by_category[category]:
+                        key = f"feature_{feature_config.name}"
+                        # 使用复选框控制特征启用状态
+                        enabled = st.checkbox(
+                            feature_config.display_name,
+                            value=feature_config.enabled,
+                            key=key,
+                            help=feature_config.description
+                        )
+                        # 更新特征库中的状态
+                        if enabled != feature_config.enabled:
+                            feature_library.set_feature_enabled(feature_config.name, enabled)
+
+    st.markdown("---")
+
+    # 批量操作
+    st.subheader("🔧 批量操作")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.button("启用所有特征", type="primary"):
+            for feature_name in feature_library.features.keys():
+                feature_library.set_feature_enabled(feature_name, True)
+            st.success("已启用所有特征")
+            st.rerun()
+
+    with col2:
+        if st.button("禁用所有特征"):
+            for feature_name in feature_library.features.keys():
+                feature_library.set_feature_enabled(feature_name, False)
+            st.success("已禁用所有特征")
+            st.rerun()
+
+    with col3:
+        if st.button("恢复默认"):
+            feature_library.apply_preset("基础配置")
+            st.success("已恢复默认配置")
+            st.rerun()
+
+    st.markdown("---")
+
+    # 配置管理
+    st.subheader("💾 配置管理")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("保存当前配置", type="primary"):
+            if feature_library.save_config():
+                st.success("特征配置已保存")
+            else:
+                st.error("保存失败")
+
+    with col2:
+        if st.button("重新加载配置"):
+            if feature_library.load_config():
+                st.success("特征配置已重新加载")
+                st.rerun()
+            else:
+                st.error("加载失败")
+
+    # 显示当前启用的特征列表
+    st.markdown("---")
+    st.subheader("📋 当前启用的特征")
+    enabled_features = feature_library.get_training_features_list()
+
+    if enabled_features:
+        # 按类别分组显示
+        enabled_by_category = {}
+        for feature_name in enabled_features:
+            config = feature_library.get_feature_config(feature_name)
+            if config:
+                category = config.category
+                if category not in enabled_by_category:
+                    enabled_by_category[category] = []
+                enabled_by_category[category].append(config.display_name)
+
+        for category, features in enabled_by_category.items():
+            st.write(f"**{category}**: {', '.join(features)}")
+
+        st.info(f"总共选择了 {len(enabled_features)} 个特征用于模型训练")
+    else:
+        st.warning("没有启用任何特征，请至少选择一些特征进行训练")
+
+    # 使用说明
+    st.markdown("---")
+    with st.expander("📖 使用说明", expanded=False):
+        st.markdown("""
+        ### 特征配置说明
+
+        1. **预设配置**: 快速选择常用的特征组合
+        2. **自定义选择**: 按类别详细选择每个特征
+        3. **批量操作**: 快速启用/禁用所有特征
+        4. **配置管理**: 保存和加载自定义配置
+
+        ### 特征类别说明
+
+        - **基础数据**: OHLCV基础价格和成交量数据
+        - **价格特征**: 价格位置、变化率等衍生特征
+        - **趋势指标**: 移动平均线等趋势判断指标
+        - **动量指标**: RSI、MACD、KDJ等动量类指标
+        - **波动率指标**: 布林带、ATR等波动率指标
+        - **成交量指标**: OBV、VWAP等成交量相关指标
+
+        ### 注意事项
+
+        - 选择过多特征可能导致过拟合
+        - 选择过少特征可能信息不足
+        - 建议从基础配置开始，逐步优化
+        - 不同的期货品种可能适合不同的特征组合
+        """)
 
 
 if __name__ == "__main__":

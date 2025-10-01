@@ -213,7 +213,8 @@ def classification_prediction(X: pd.DataFrame, y: pd.Series, train_size: float =
 
 
 def train_complete_workflow(df: pd.DataFrame, historical_days: int = 7, prediction_days: int = 3,
-                           task_type: str = 'regression', train_size: float = 0.7) -> Dict[str, Any]:
+                           task_type: str = 'regression', train_size: float = 0.7,
+                           selected_features: List[str] = None) -> Dict[str, Any]:
     """
     完整的模型训练工作流
 
@@ -223,6 +224,7 @@ def train_complete_workflow(df: pd.DataFrame, historical_days: int = 7, predicti
         prediction_days: 预测天数
         task_type: 任务类型
         train_size: 训练集比例
+        selected_features: 选择的特征列表
 
     Returns:
         包含所有训练结果的字典
@@ -235,7 +237,8 @@ def train_complete_workflow(df: pd.DataFrame, historical_days: int = 7, predicti
         df_processed,
         historical_days=historical_days,
         prediction_days=prediction_days,
-        task_type=task_type
+        task_type=task_type,
+        selected_features=selected_features
     )
 
     if len(X) == 0:

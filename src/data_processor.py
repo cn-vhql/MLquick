@@ -5,7 +5,7 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 
 def calculate_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
@@ -130,7 +130,8 @@ def calculate_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def create_features_targets(df: pd.DataFrame, historical_days: int = 7,
-                          prediction_days: int = 3, task_type: str = 'regression') -> Tuple[pd.DataFrame, pd.Series]:
+                          prediction_days: int = 3, task_type: str = 'regression',
+                          selected_features: List[str] = None) -> Tuple[pd.DataFrame, pd.Series]:
     """
     创建特征矩阵和目标变量
 
@@ -139,32 +140,47 @@ def create_features_targets(df: pd.DataFrame, historical_days: int = 7,
         historical_days: 使用过去多少天的数据作为特征
         prediction_days: 预测未来多少天
         task_type: 任务类型 ('regression' 或 'classification')
+        selected_features: 选择的特征列表，如果为None则使用所有可用特征
 
     Returns:
         特征矩阵和目标变量
     """
-    # 特征列
-    feature_columns = [
+    # 如果没有指定选择的特征，则使用特征库中启用的特征
+    if selected_features is None:
+        try:
+            from feature_library import feature_library
+            selected_features = feature_library.get_training_features_list()
+        except ImportError:
+            st.warning("无法导入特征库，将使用所有可用特征")
+            selected_features = None
+
+    # 定义所有可能的特征列
+    all_feature_columns = [
         'open', 'high', 'low', 'close', 'volume',
         'MA5', 'MA10', 'MA20', 'RSI', 'MACD', 'Signal', 'Histogram',
         'BB_upper', 'BB_middle', 'BB_lower',
-        'price_change', 'price_change_3d', 'price_change_5d'
-    ]
-
-    # 添加成交量相关特征
-    volume_features = ['volume_MA5', 'volume_MA10', 'volume_ratio', 'price_position', 'volatility']
-    for feature in volume_features:
-        if feature in df.columns:
-            feature_columns.append(feature)
-
-    # 添加新的技术指标特征
-    new_features = [
+        'price_change', 'price_change_3d', 'price_change_5d',
+        'volume_MA5', 'volume_MA10', 'volume_ratio', 'price_position', 'volatility',
         'Williams_R', 'K_value', 'D_value', 'J_value', 'momentum',
         'price_acceleration', 'VWAP', 'ATR', 'CCI', 'OBV'
     ]
-    for feature in new_features:
-        if feature in df.columns:
-            feature_columns.append(feature)
+
+    # 如果指定了选择的特征，则只使用这些特征
+    if selected_features is not None:
+        feature_columns = []
+        for feature in selected_features:
+            if feature in all_feature_columns and feature in df.columns:
+                feature_columns.append(feature)
+
+        if not feature_columns:
+            st.error("选择的特征在数据中都不存在，请检查数据或特征配置")
+            return pd.DataFrame(), pd.Series()
+
+        st.info(f"使用 {len(feature_columns)} 个选择的特征进行训练")
+    else:
+        # 如果没有指定选择的特征，使用所有可用特征
+        feature_columns = [col for col in all_feature_columns if col in df.columns]
+        st.info(f"使用所有 {len(feature_columns)} 个可用特征进行训练")
 
     # 确保所有特征列都存在
     available_features = [col for col in feature_columns if col in df.columns]
