@@ -19,11 +19,14 @@
 - 🔧 **自动预处理**: 数据标准化和特征工程
 - 📋 **详细报告**: 模型性能对比和评估指标
 
-## 应用截图
-![alt text](data/samples/image.png)
-![alt text](data/samples/image-3.png)
-![alt text](data/samples/image-4.png)
-![alt text](data/samples/image-2.png)
+## ✨ 应用截图
+![alt text](/data/samples/image-1.png)
+![alt text](/data/samples/image-2.png)
+![alt text](/data/samples/image-3.png)
+![alt text](/data/samples/image.png)
+![alt text](/data/samples/image-4.png)
+![alt text](/data/samples/image-5.png)
+![alt text](/data/samples/image-6.png)
 
 ## 🛠️ 技术栈
 
