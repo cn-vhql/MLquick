@@ -3,7 +3,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.7+-blue.svg)](https://python.org)
 [![Streamlit](https://img.shields.io/badge/streamlit-1.49.1-red.svg)](https://streamlit.io)
 [![PyCaret](https://img.shields.io/badge/pycaret-3.3.2-orange.svg)](https://pycaret.org)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 一个基于Streamlit和PyCaret的快速机器学习建模平台，支持分类和回归任务的自动化模型训练、比较和预测。
 
@@ -13,20 +13,22 @@
 - 📊 **多模型对比**: 自动训练和比较多种机器学习算法
 - 🎯 **分类任务**: 支持各种分类问题的建模和预测
 - 📈 **回归任务**: 支持回归问题的建模和预测
+- 🎲 **聚类分析**: K-means无监督聚类，自动发现数据群组
 - 💾 **模型保存**: 自动保存最佳模型供后续使用
 - 📁 **文件支持**: 支持CSV和Excel格式数据文件
 - 🎨 **交互界面**: 基于Streamlit的直观Web界面
 - 🔧 **自动预处理**: 数据标准化和特征工程
 - 📋 **详细报告**: 模型性能对比和评估指标
+- 📊 **可视化分析**: 聚类结果多维度可视化展示
 
 ## ✨ 应用截图
-![alt text](/data/samples/image-1.png)
-![alt text](/data/samples/image-2.png)
-![alt text](/data/samples/image-3.png)
-![alt text](/data/samples/image.png)
-![alt text](/data/samples/image-4.png)
-![alt text](/data/samples/image-5.png)
-![alt text](/data/samples/image-6.png)
+![alt text](/data/png/image-1.png)
+![alt text](/data/png/image-2.png)
+![alt text](/data/png/image-3.png)
+![alt text](/data/png/image.png)
+![alt text](/data/png/image-4.png)
+![alt text](/data/png/image-5.png)
+![alt text](/data/png/image-6.png)
 
 ## 🛠️ 技术栈
 
@@ -163,34 +165,33 @@ CMD ["streamlit", "run", "src/MLquick.py"]
 
 ```
 MLquick/
-├── src/                        # 源代码
-│   ├── __init__.py
+├── src/                        # 源代码目录
+│   ├── __init__.py            # 包初始化文件
 │   ├── MLquick.py             # 主应用程序
 │   ├── models/                # 模型相关模块
-│   │   ├── __init__.py
-│   │   ├── classification.py  # 分类任务
-│   │   ├── regression.py      # 回归任务
-│   │   └── prediction.py      # 预测功能
+│   │   └── __init__.py        # 模型模块初始化
 │   └── utils/                 # 工具模块
-│       ├── __init__.py
-│       ├── data_processor.py  # 数据处理
-│       └── visualization.py   # 可视化工具
-├── docs/                      # 文档
+│       └── __init__.py        # 工具模块初始化
+├── docs/                      # 文档目录
 │   ├── api.md                 # API文档
-│   ├── examples.md            # 示例
-│   └── deployment.md          # 部署指南
+│   └── examples.md            # 示例数据说明
 ├── data/                      # 数据目录
-│   ├── raw/                   # 原始数据
-│   ├── processed/             # 处理后数据
-│   └── samples/               # 示例数据
-├── models/                    # 模型文件
-├── notebooks/                 # Jupyter笔记本
-├── tests/                     # 测试文件
-├── requirements.txt           # 依赖列表
-├── .gitignore                # Git忽略文件
-├── README.md                 # 项目说明
-├── LICENSE                   # 许可证
-└── Dockerfile               # Docker配置
+│   ├── samples/               # 示例数据
+│   │   ├── classification_sample.csv  # 分类任务样例数据
+│   │   ├── regression_sample.csv      # 回归任务样例数据
+│   │   └── clustering_sample.csv     # 聚类任务样例数据
+│   └── png/                   # 图片资源
+├── models/                    # 训练好的模型文件
+├── notebooks/                 # Jupyter笔记本（预留）
+├── tests/                     # 测试文件（预留）
+├── .venv/                     # Python虚拟环境
+├── .git/                      # Git版本控制
+├── .claude/                   # Claude配置
+├── requirements.txt           # 依赖包列表
+├── .gitignore                 # Git忽略文件配置
+├── LICENSE                    # MIT许可证
+├── README.md                  # 项目说明文档
+└── logs.log                   # 日志文件
 ```
 
 ## 🔧 API文档
@@ -272,6 +273,36 @@ MLquick/
 4. 设置训练集比例（推荐0.7）
 5. 点击"训练模型"
 
+### 3. 聚类任务数据 (`clustering_sample.csv`)
+**场景**: 客户细分分析
+- **样本数量**: 200条
+- **特征数量**: 10个数值特征
+- **任务类型**: 无监督聚类分析
+
+**特征说明**:
+- `age`: 年龄
+- `income`: 年收入
+- `spending_score`: 消费评分 (0-100)
+- `savings_score`: 储蓄评分 (0-100)
+- `years_as_customer`: 客户年限
+- `avg_monthly_purchases`: 月均购买次数
+- `online_frequency`: 线上购物频率
+- `in_store_frequency`: 线下购物频率
+- `discount_usage`: 优惠使用率 (%)
+- `loyalty_points`: 会员积分
+
+**使用方法**:
+1. 上传 `data/samples/clustering_sample.csv` 文件
+2. 选择任务类型为"聚类"
+3. 设置聚类数量（推荐3-5个）
+4. 选择用于聚类的特征（可多选，默认使用前5个数值特征）
+5. 点击"训练模型"
+
+**预期聚类结果**:
+- 聚类0: 高收入高消费的优质客户
+- 聚类1: 中等收入的稳定客户
+- 聚类2: 年轻的低消费客户
+
 ### 快速开始示例
 ```python
 # 加载分类样例数据
@@ -280,6 +311,9 @@ data = pd.read_csv('data/samples/classification_sample.csv')
 
 # 或者加载回归样例数据
 data = pd.read_csv('data/samples/regression_sample.csv')
+
+# 或者加载聚类样例数据
+data = pd.read_csv('data/samples/clustering_sample.csv')
 ```
 
 ## ❓ 常见问题
@@ -328,7 +362,7 @@ A: 可以在界面上选择下载预测结果为CSV文件。
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+本项目采用 Apache License 2.0 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ## 🙏 致谢
 
