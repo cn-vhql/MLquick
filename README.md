@@ -1,4 +1,4 @@
-# MLquick - 机器学习算法模型零代码应用平台
+# MLquick - 机器学习零代码应用平台
 
 [![Python Version](https://img.shields.io/badge/python-3.7+-blue.svg)](https://python.org)
 [![Streamlit](https://img.shields.io/badge/streamlit-1.49.1-red.svg)](https://streamlit.io)
