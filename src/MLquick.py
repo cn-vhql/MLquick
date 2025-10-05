@@ -52,7 +52,7 @@ def prediction(model_path, prediction_file):
 
 # 定义主函数
 def main():
-    st.title("机器学习算法模型平台")
+    st.markdown("### 🤖 MLquick - 机器学习算法模型零代码应用平台")
     # 上传数据
     uploaded_file = st.file_uploader("上传数据集 (CSV 或 Excel格式)", type=["csv", "xlsx"])
     if uploaded_file is not None:

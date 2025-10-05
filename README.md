@@ -1,4 +1,4 @@
-# MLquick - 机器学习算法模型平台
+# MLquick - 机器学习算法模型零代码应用平台
 
 [![Python Version](https://img.shields.io/badge/python-3.7+-blue.svg)](https://python.org)
 [![Streamlit](https://img.shields.io/badge/streamlit-1.49.1-red.svg)](https://streamlit.io)
@@ -18,6 +18,12 @@
 - 🎨 **交互界面**: 基于Streamlit的直观Web界面
 - 🔧 **自动预处理**: 数据标准化和特征工程
 - 📋 **详细报告**: 模型性能对比和评估指标
+
+## 应用截图
+![alt text](data/samples/image.png)
+![alt text](data/samples/image-3.png)
+![alt text](data/samples/image-4.png)
+![alt text](data/samples/image-2.png)
 
 ## 🛠️ 技术栈
 
@@ -211,26 +217,66 @@ MLquick/
 
 ## 📊 示例数据
 
-### 分类任务示例
+项目提供了两个样例数据文件，位于 `data/samples/` 目录：
+
+### 1. 分类任务数据 (`classification_sample.csv`)
+**场景**: 客户购买行为预测
+- **样本数量**: 500条
+- **特征数量**: 6个特征
+- **目标变量**: `purchase_category` (购买类别)
+  - Electronics (电子产品)
+  - Books (图书)
+  - Clothing (服装)
+
+**特征说明**:
+- `age`: 年龄
+- `income`: 收入
+- `education_level`: 教育水平
+- `years_experience`: 工作经验年限
+- `has_credit_card`: 是否有信用卡
+- `marital_status`: 婚姻状况
+
+**使用方法**:
+1. 上传 `data/samples/classification_sample.csv` 文件
+2. 选择任务类型为"分类"
+3. 选择目标变量为 `purchase_category`
+4. 设置训练集比例（推荐0.7）
+5. 点击"训练模型"
+
+### 2. 回归任务数据 (`regression_sample.csv`)
+**场景**: 房价预测
+- **样本数量**: 400条
+- **特征数量**: 11个特征
+- **目标变量**: `price_in_thousands` (房价，单位：千美元)
+
+**特征说明**:
+- `house_age`: 房屋年龄
+- `square_feet`: 面积（平方英尺）
+- `num_bedrooms`: 卧室数量
+- `num_bathrooms`: 浴室数量
+- `garage_size`: 车库大小
+- `neighborhood_quality`: 社区质量评分 (1-10)
+- `school_rating`: 学校评分 (1-10)
+- `distance_to_downtown`: 距离市中心距离（英里）
+- `has_pool`: 是否有游泳池
+- `has_garden`: 是否有花园
+- `year_built`: 建造年份
+
+**使用方法**:
+1. 上传 `data/samples/regression_sample.csv` 文件
+2. 选择任务类型为"回归"
+3. 选择目标变量为 `price_in_thousands`
+4. 设置训练集比例（推荐0.7）
+5. 点击"训练模型"
+
+### 快速开始示例
 ```python
-# 鸢尾花数据集示例
-from sklearn.datasets import load_iris
+# 加载分类样例数据
 import pandas as pd
+data = pd.read_csv('data/samples/classification_sample.csv')
 
-iris = load_iris()
-data = pd.DataFrame(data=iris.data, columns=iris.feature_names)
-data['target'] = iris.target
-```
-
-### 回归任务示例
-```python
-# 波士顿房价数据集示例
-from sklearn.datasets import load_boston
-import pandas as pd
-
-boston = load_boston()
-data = pd.DataFrame(data=boston.data, columns=boston.feature_names)
-data['target'] = boston.target
+# 或者加载回归样例数据
+data = pd.read_csv('data/samples/regression_sample.csv')
 ```
 
 ## ❓ 常见问题
@@ -289,9 +335,9 @@ A: 可以在界面上选择下载预测结果为CSV文件。
 
 ## 📞 联系方式
 
-- 项目主页: [GitHub Repository](https://github.com/yourusername/MLquick)
-- 问题反馈: [GitHub Issues](https://github.com/yourusername/MLquick/issues)
-- 邮箱: your.email@example.com
+- 项目主页: [GitHub Repository](https://github.com/cn-vhql/MLquick)
+- 问题反馈: [GitHub Issues](https://github.com/cn-vhql/MLquick/issues)
+- 邮箱: yl_zhangqiang@foxmail.com
 
 ---
 
