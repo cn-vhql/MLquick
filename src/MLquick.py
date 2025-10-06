@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import seaborn as sns
 import numpy as np
+from PIL import Image
 
 # 文本处理相关导入
 import re
@@ -37,6 +38,45 @@ except ImportError:
 
 # 抑制jieba的日志输出
 jieba.setLogLevel(jieba.logging.INFO)
+
+
+def get_chinese_font_path():
+    """获取可用的中文字体路径"""
+    import matplotlib.font_manager as fm
+
+    # 常见的中文字体路径（Windows）
+    chinese_font_paths = [
+        'C:/Windows/Fonts/msyh.ttc',      # Microsoft YaHei
+        'C:/Windows/Fonts/msyhbd.ttc',    # Microsoft YaHei Bold
+        'C:/Windows/Fonts/simhei.ttf',    # SimHei
+        'C:/Windows/Fonts/simsun.ttc',    # SimSun
+        'C:/Windows/Fonts/simkai.ttf',    # KaiTi
+        'C:/Windows/Fonts/NotoSansSC-VF.ttf',  # Noto Sans SC
+        'C:/Windows/Fonts/Deng.ttf',      # DengXian
+        'C:/Windows/Fonts/Dengb.ttf',     # DengXian Bold
+    ]
+
+    # 检查字体文件是否存在
+    for font_path in chinese_font_paths:
+        if os.path.exists(font_path):
+            return font_path
+
+    # 如果直接路径不存在，尝试通过字体管理器查找
+    try:
+        font_manager = fm.FontManager()
+        fonts = font_manager.ttflist
+
+        # 寻找中文字体
+        for font in fonts:
+            font_name = font.name.lower()
+            if any(keyword in font_name for keyword in ['yahei', 'simhei', 'simsun', 'kaiti', 'deng', 'noto sans sc']):
+                return font.fname
+
+    except Exception:
+        pass  # 字体查找失败时静默处理
+
+    # 如果都没找到，返回None（使用默认字体）
+    return None
 
 
 def generate_model_id():
@@ -160,66 +200,132 @@ def create_text_visualizations(text_data, labels=None, title="文本分析"):
     try:
         # 生成词云图
         all_text = ' '.join(text_data.dropna().astype(str))
+
         if all_text.strip():
-            wordcloud = WordCloud(
-                width=800,
-                height=400,
-                background_color='white',
-                max_words=100,
-                font_path=None,  # 使用默认字体，中文可能需要指定字体路径
-                colormap='viridis'
-            ).generate(all_text)
+            # 检测是否包含中文
+            has_chinese = bool(re.search(r'[\u4e00-\u9fff]', all_text))
 
-            fig = plt.figure(figsize=(10, 5))
-            plt.imshow(wordcloud, interpolation='bilinear')
-            plt.axis('off')
-            plt.title(f'{title} - 词云图')
+            # 创建词云图
+            if has_chinese:
+                # 获取可用的中文字体路径
+                chinese_font_path = get_chinese_font_path()
 
-            # 转换为plotly图表
+                wordcloud = WordCloud(
+                    width=800,
+                    height=400,
+                    background_color='white',
+                    max_words=100,
+                    font_path=chinese_font_path,  # 使用自动检测的中文字体
+                    colormap='viridis',
+                    relative_scaling=0.5,
+                    min_font_size=10,
+                    prefer_horizontal=0.9,
+                    scale=2
+                ).generate(all_text)
+            else:
+                # 英文文本
+                wordcloud = WordCloud(
+                    width=800,
+                    height=400,
+                    background_color='white',
+                    max_words=100,
+                    colormap='viridis',
+                    relative_scaling=0.5,
+                    min_font_size=10,
+                    prefer_horizontal=0.9,
+                    scale=2
+                ).generate(all_text)
+
+            # 使用matplotlib创建图像
+            fig, ax = plt.subplots(figsize=(10, 5))
+            ax.imshow(wordcloud, interpolation='bilinear')
+            ax.axis('off')
+            ax.set_title(f'{title} - 词云图', fontsize=16)
+
+            # 保存到内存
             img_buf = io.BytesIO()
-            plt.savefig(img_buf, format='png', bbox_inches='tight')
+            plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=300)
             img_buf.seek(0)
-            img_data = img_buf.getvalue()
 
-            # 使用plotly显示图片
+            # 直接使用PIL读取图像并转换为numpy数组
+            img = Image.open(img_buf)
+            img_array = np.array(img)
+
+            # 创建plotly图表
             fig_plotly = px.imshow(
-                plt.imread(img_buf),
+                img_array,
                 title=f'{title} - 词云图'
             )
+            fig_plotly.update_layout(
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
+            )
+
             visualizations['wordcloud'] = fig_plotly
-            plt.close()
+            plt.close(fig)
 
         # 如果有标签，创建不同类别的词云
         if labels is not None and len(labels) == len(text_data):
             unique_labels = pd.Series(labels).unique()
             for label in unique_labels[:3]:  # 最多显示3个类别
                 label_text = ' '.join(text_data[labels == label].dropna().astype(str))
-                if label_text.strip():
-                    wordcloud = WordCloud(
-                        width=600,
-                        height=300,
-                        background_color='white',
-                        max_words=50
-                    ).generate(label_text)
 
-                    fig = plt.figure(figsize=(8, 4))
-                    plt.imshow(wordcloud, interpolation='bilinear')
-                    plt.axis('off')
-                    plt.title(f'{title} - 类别 {label} 词云图')
+                if label_text.strip():
+                    has_chinese = bool(re.search(r'[\u4e00-\u9fff]', label_text))
+
+                    if has_chinese:
+                        # 获取可用的中文字体路径
+                        chinese_font_path = get_chinese_font_path()
+
+                        wordcloud = WordCloud(
+                            width=600,
+                            height=300,
+                            background_color='white',
+                            max_words=50,
+                            font_path=chinese_font_path,  # 使用自动检测的中文字体
+                            relative_scaling=0.5,
+                            min_font_size=8,
+                            prefer_horizontal=0.9,
+                            scale=2
+                        ).generate(label_text)
+                    else:
+                        wordcloud = WordCloud(
+                            width=600,
+                            height=300,
+                            background_color='white',
+                            max_words=50,
+                            relative_scaling=0.5,
+                            min_font_size=8,
+                            prefer_horizontal=0.9,
+                            scale=2
+                        ).generate(label_text)
+
+                    fig, ax = plt.subplots(figsize=(8, 4))
+                    ax.imshow(wordcloud, interpolation='bilinear')
+                    ax.axis('off')
+                    ax.set_title(f'{title} - 类别 {label} 词云图', fontsize=14)
 
                     img_buf = io.BytesIO()
-                    plt.savefig(img_buf, format='png', bbox_inches='tight')
+                    plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=300)
                     img_buf.seek(0)
 
+                    img = Image.open(img_buf)
+                    img_array = np.array(img)
+
                     fig_plotly = px.imshow(
-                        plt.imread(img_buf),
+                        img_array,
                         title=f'{title} - 类别 {label} 词云图'
                     )
+                    fig_plotly.update_layout(
+                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
+                    )
+
                     visualizations[f'wordcloud_{label}'] = fig_plotly
-                    plt.close()
+                    plt.close(fig)
 
     except Exception as e:
-        st.warning(f"生成词云图时出现错误: {str(e)}")
+        st.warning(f"⚠️ 生成词云图时出现错误: {str(e)}")
 
     return visualizations
 
