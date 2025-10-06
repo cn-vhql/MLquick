@@ -14,10 +14,214 @@ from plotly.subplots import make_subplots
 import seaborn as sns
 import numpy as np
 
+# 文本处理相关导入
+import re
+import jieba
+import jieba.analyse
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+from sklearn.cluster import KMeans
+from wordcloud import WordCloud
+import warnings
+
+# 尝试导入nltk
+try:
+    import nltk
+    from nltk.corpus import stopwords
+    from nltk.tokenize import word_tokenize
+    from nltk.stem import WordNetLemmatizer
+    NLTK_AVAILABLE = True
+except ImportError:
+    NLTK_AVAILABLE = False
+    st.warning("⚠️ NLTK未安装，英文文本处理功能受限")
+
+# 抑制jieba的日志输出
+jieba.setLogLevel(jieba.logging.INFO)
+
 
 def generate_model_id():
     """生成基于日期时间的模型ID"""
     return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def detect_language(text):
+    """检测文本是中文还是英文"""
+    if pd.isna(text) or text == "":
+        return "unknown"
+
+    # 计算中文字符比例
+    chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', str(text)))
+    total_chars = len(re.sub(r'\s+', '', str(text)))
+
+    if total_chars == 0:
+        return "unknown"
+
+    chinese_ratio = chinese_chars / total_chars
+    return "chinese" if chinese_ratio > 0.3 else "english"
+
+
+def preprocess_text_column(series, language="auto", remove_stopwords=True, min_word_length=2):
+    """
+    预处理文本列
+    参数:
+    - series: pandas Series，包含文本数据
+    - language: "auto", "chinese", "english"
+    - remove_stopwords: 是否移除停用词
+    - min_word_length: 最小词长度
+    """
+    processed_texts = []
+
+    for text in series:
+        if pd.isna(text) or text == "":
+            processed_texts.append("")
+            continue
+
+        text = str(text).strip()
+
+        # 自动检测语言
+        if language == "auto":
+            detected_lang = detect_language(text)
+        else:
+            detected_lang = language
+
+        # 清理文本
+        text = re.sub(r'[^\w\s\u4e00-\u9fff]', ' ', text)  # 保留中英文和数字
+        text = re.sub(r'\s+', ' ', text)  # 合并多个空格
+
+        if detected_lang == "chinese":
+            # 中文分词处理
+            words = jieba.lcut(text)
+
+            # 移除停用词（基础中文停用词）
+            if remove_stopwords:
+                chinese_stopwords = {'的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这'}
+                words = [word for word in words if word not in chinese_stopwords and len(word) >= min_word_length]
+
+            processed_text = ' '.join(words)
+
+        else:
+            # 英文处理
+            text = text.lower()
+            words = text.split()
+
+            # 移除停用词（使用nltk）
+            if remove_stopwords and NLTK_AVAILABLE:
+                try:
+                    stop_words = set(stopwords.words('english'))
+                    words = [word for word in words if word not in stop_words and len(word) >= min_word_length]
+                except:
+                    # 如果nltk数据未下载，使用基础停用词
+                    basic_stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them'}
+                    words = [word for word in words if word not in basic_stopwords and len(word) >= min_word_length]
+
+            processed_text = ' '.join(words)
+
+        processed_texts.append(processed_text)
+
+    return pd.Series(processed_texts)
+
+
+def extract_text_features(text_data, max_features=1000, method="tfidf"):
+    """
+    从文本数据提取特征
+    参数:
+    - text_data: 预处理后的文本数据（Series）
+    - max_features: 最大特征数
+    - method: "tfidf" 或 "count"
+    """
+    if method == "tfidf":
+        vectorizer = TfidfVectorizer(
+            max_features=max_features,
+            ngram_range=(1, 2),  # 1-gram和2-gram
+            min_df=2,  # 至少出现在2个文档中
+            max_df=0.8  # 最多出现在80%的文档中
+        )
+    else:
+        vectorizer = CountVectorizer(
+            max_features=max_features,
+            ngram_range=(1, 2),
+            min_df=2,
+            max_df=0.8
+        )
+
+    try:
+        features = vectorizer.fit_transform(text_data)
+        feature_names = vectorizer.get_feature_names_out()
+        return features, feature_names, vectorizer
+    except Exception as e:
+        st.error(f"文本特征提取失败: {str(e)}")
+        return None, None, None
+
+
+def create_text_visualizations(text_data, labels=None, title="文本分析"):
+    """创建文本分析可视化"""
+    visualizations = {}
+
+    try:
+        # 生成词云图
+        all_text = ' '.join(text_data.dropna().astype(str))
+        if all_text.strip():
+            wordcloud = WordCloud(
+                width=800,
+                height=400,
+                background_color='white',
+                max_words=100,
+                font_path=None,  # 使用默认字体，中文可能需要指定字体路径
+                colormap='viridis'
+            ).generate(all_text)
+
+            fig = plt.figure(figsize=(10, 5))
+            plt.imshow(wordcloud, interpolation='bilinear')
+            plt.axis('off')
+            plt.title(f'{title} - 词云图')
+
+            # 转换为plotly图表
+            img_buf = io.BytesIO()
+            plt.savefig(img_buf, format='png', bbox_inches='tight')
+            img_buf.seek(0)
+            img_data = img_buf.getvalue()
+
+            # 使用plotly显示图片
+            fig_plotly = px.imshow(
+                plt.imread(img_buf),
+                title=f'{title} - 词云图'
+            )
+            visualizations['wordcloud'] = fig_plotly
+            plt.close()
+
+        # 如果有标签，创建不同类别的词云
+        if labels is not None and len(labels) == len(text_data):
+            unique_labels = pd.Series(labels).unique()
+            for label in unique_labels[:3]:  # 最多显示3个类别
+                label_text = ' '.join(text_data[labels == label].dropna().astype(str))
+                if label_text.strip():
+                    wordcloud = WordCloud(
+                        width=600,
+                        height=300,
+                        background_color='white',
+                        max_words=50
+                    ).generate(label_text)
+
+                    fig = plt.figure(figsize=(8, 4))
+                    plt.imshow(wordcloud, interpolation='bilinear')
+                    plt.axis('off')
+                    plt.title(f'{title} - 类别 {label} 词云图')
+
+                    img_buf = io.BytesIO()
+                    plt.savefig(img_buf, format='png', bbox_inches='tight')
+                    img_buf.seek(0)
+
+                    fig_plotly = px.imshow(
+                        plt.imread(img_buf),
+                        title=f'{title} - 类别 {label} 词云图'
+                    )
+                    visualizations[f'wordcloud_{label}'] = fig_plotly
+                    plt.close()
+
+    except Exception as e:
+        st.warning(f"生成词云图时出现错误: {str(e)}")
+
+    return visualizations
 
 
 def get_model_files():
@@ -125,26 +329,92 @@ def create_clustering_visualizations(data, cluster_labels, n_clusters):
     return visualizations
 
 
-# K-means聚类任务函数
-def clustering_task(data, n_clusters, features=None):
+# 支持文本的聚类任务函数
+def clustering_task(data, n_clusters, features=None, include_text_features=False, text_columns=None):
     from pycaret.clustering import setup, create_model, assign_model, pull, plot_model
     from pycaret.clustering import save_model as save_cluster_model
 
-    # 数据预处理：只选择数值型特征
+    # 分离数值和文本特征
     numeric_data = data.select_dtypes(include=[np.number])
+    text_data = pd.DataFrame()
 
+    # 处理文本特征
+    if include_text_features:
+        text_columns = text_columns or []
+
+        # 如果没有指定文本列，自动检测
+        if not text_columns:
+            text_columns = data.select_dtypes(include=['object']).columns.tolist()
+            text_columns = [col for col in text_columns if col not in features] if features else text_columns
+
+        for col in text_columns:
+            if col in data.columns:
+                st.info(f"正在处理文本列: {col}")
+                processed_text = preprocess_text_column(data[col])
+                text_data[col] = processed_text
+
+    # 选择用户指定的特征
     if features:
-        # 如果用户选择了特定特征
-        available_features = [f for f in features if f in numeric_data.columns]
-        if available_features:
-            numeric_data = numeric_data[available_features]
+        available_numeric = [f for f in features if f in numeric_data.columns]
+        available_text = [f for f in features if f in text_columns and f in text_data.columns]
 
-    if numeric_data.empty:
-        st.error("❌ 没有找到可用的数值型特征进行聚类分析")
-        return None, None, None
+        if available_numeric:
+            numeric_data = numeric_data[available_numeric]
+        if available_text:
+            text_data = text_data[available_text]
+
+    # 如果没有特征，自动选择
+    if numeric_data.empty and text_data.empty:
+        if not data.select_dtypes(include=[np.number]).empty:
+            numeric_data = data.select_dtypes(include=[np.number])
+        elif not data.select_dtypes(include=['object']).empty:
+            auto_text_cols = data.select_dtypes(include=['object']).columns.tolist()[:2]  # 最多2个文本列
+            for col in auto_text_cols:
+                processed_text = preprocess_text_column(data[col])
+                text_data[col] = processed_text
+
+    if numeric_data.empty and text_data.empty:
+        st.error("❌ 没有找到可用于聚类分析的特征")
+        return None, None, None, None, None
+
+    # 合并数值和文本特征
+    combined_data = numeric_data.copy()
+
+    if not text_data.empty:
+        # 提取文本特征
+        all_text_features = []
+        feature_names = []
+
+        for col in text_data.columns:
+            if not text_data[col].empty and text_data[col].str.strip().any():
+                features_matrix, names, vectorizer = extract_text_features(
+                    text_data[col], max_features=100, method="tfidf"
+                )
+                if features_matrix is not None:
+                    # 转换为DataFrame
+                    text_features_df = pd.DataFrame(
+                        features_matrix.toarray(),
+                        columns=[f"{col}_{name}" for name in names]
+                    )
+                    all_text_features.append(text_features_df)
+                    feature_names.extend([f"{col}_{name}" for name in names])
+
+        if all_text_features:
+            # 合并所有文本特征
+            combined_text_features = pd.concat(all_text_features, axis=1)
+            combined_data = pd.concat([combined_data, combined_text_features], axis=1)
+
+            # 如果特征太多，使用PCA降维
+            if combined_data.shape[1] > 50:
+                from sklearn.decomposition import PCA
+                pca = PCA(n_components=50, random_state=123)
+                numeric_cols = combined_data.select_dtypes(include=[np.number]).columns
+                combined_data[numeric_cols] = pca.fit_transform(combined_data[numeric_cols])
+                st.info(f"🔧 特征维度已降维至50维以优化性能")
 
     # 设置聚类环境
-    setup(data=numeric_data, session_id=123, normalize=True, verbose=False)
+    with st.spinner("正在设置聚类环境..."):
+        setup(data=combined_data, session_id=123, normalize=True, verbose=False)
 
     # 创建K-means模型
     with st.spinner("正在训练K-means聚类模型..."):
@@ -158,20 +428,34 @@ def clustering_task(data, n_clusters, features=None):
     # 创建可视化
     visualizations = create_clustering_visualizations(numeric_data, clustered_data['Cluster'], n_clusters)
 
+    # 如果有文本特征，添加文本可视化
+    if not text_data.empty:
+        text_visualizations = create_text_visualizations(
+            text_data.iloc[:, 0],  # 使用第一个文本列
+            labels=clustered_data['Cluster'],
+            title="文本聚类分析"
+        )
+        visualizations.update(text_visualizations)
+
     # 保存模型信息
     model_info = {
         "数据集大小": f"{len(data)} 行",
         "原始特征数量": f"{len(data.columns)} 个",
         "数值特征数量": f"{len(numeric_data.columns)} 个",
+        "文本特征数量": f"{len(text_data.columns)} 个" if not text_data.empty else "0 个",
         "聚类数量": n_clusters,
         "聚类算法": "K-means",
-        "使用的特征": ", ".join(numeric_data.columns.tolist())
+        "使用的数值特征": ", ".join(numeric_data.columns.tolist()) if not numeric_data.empty else "无",
+        "使用的文本特征": ", ".join(text_data.columns.tolist()) if not text_data.empty else "无"
     }
 
-    # 计算聚类统计信息
-    cluster_stats = clustered_data.groupby('Cluster').agg({
-        col: ['mean', 'std', 'count'] for col in numeric_data.columns
-    }).round(3)
+    # 计算聚类统计信息（仅数值特征）
+    if not numeric_data.empty:
+        cluster_stats = clustered_data.groupby('Cluster').agg({
+            col: ['mean', 'std', 'count'] for col in numeric_data.columns
+        }).round(3)
+    else:
+        cluster_stats = clustered_data.groupby('Cluster').size().reset_index(name='count')
 
     model_info["聚类统计"] = f"已生成各聚类的统计信息"
 
@@ -179,50 +463,114 @@ def clustering_task(data, n_clusters, features=None):
     model_name = save_model_with_id(kmeans_model, "clustering", model_info)
     st.session_state.current_model_name = model_name
 
-    # 保存聚类结果
-    clustered_data.to_csv(f"../models/{model_name}_results.csv", index=False)
+    # 保存聚类结果（包含原始数据和聚类标签）
+    result_data = data.copy()
+    result_data['Cluster'] = clustered_data['Cluster']
+    result_data.to_csv(f"../models/{model_name}_results.csv", index=False)
 
     return kmeans_model, clustered_data, model_name, visualizations, cluster_stats
 
 
-# 分类任务函数
-def classification_task(data, target_variable, train_size):
+# 支持文本的分类任务函数
+def classification_task(data, target_variable, train_size, preprocess_text=False, text_columns=None):
     from pycaret.classification import setup, compare_models, save_model, pull, plot_model, predict_model
     from pycaret.classification import save_model as save_clf_model
 
-    setup(data=data, target=target_variable, session_id=123, normalize=True, train_size=train_size)
-    best_model = compare_models()
-    st.success("✅ 模型训练完成！")
+    # 处理文本预处理
+    processed_data = data.copy()
+    text_processing_info = {"文本列数量": 0, "处理的文本列": []}
+
+    if preprocess_text:
+        text_columns = text_columns or []
+
+        # 如果没有指定文本列，自动检测
+        if not text_columns:
+            text_columns = data.select_dtypes(include=['object']).columns.tolist()
+            text_columns = [col for col in text_columns if col != target_variable]
+
+        for col in text_columns:
+            if col in data.columns and col != target_variable:
+                st.info(f"正在预处理文本列: {col}")
+                processed_data[col] = preprocess_text_column(data[col])
+                text_processing_info["处理的文本列"].append(col)
+                text_processing_info["文本列数量"] += 1
+
+    # 设置分类环境
+    setup(data=processed_data, target=target_variable, session_id=123, normalize=True,
+          train_size=train_size)
+
+    with st.spinner("正在训练和比较分类模型..."):
+        best_model = compare_models()
+    st.success("✅ 分类模型训练完成！")
 
     # 保存模型信息
     model_comparison = pull()
     best_model_name = str(best_model)
     accuracy = model_comparison.loc['Accuracy', best_model_name] if 'Accuracy' in model_comparison.index else 'N/A'
 
+    # 统计特征类型
+    numeric_features = len(processed_data.select_dtypes(include=[np.number]).columns) - 1  # 减去目标变量
+    text_features = len([col for col in processed_data.columns if processed_data[col].dtype == 'object' and col != target_variable])
+
     model_info = {
         "数据集大小": f"{len(data)} 行",
-        "特征数量": f"{len(data.columns) - 1} 个",
+        "数值特征数量": f"{numeric_features} 个",
+        "文本特征数量": f"{text_features} 个",
         "目标变量": target_variable,
         "训练集比例": f"{train_size:.1%}",
         "最佳模型": best_model_name,
-        "准确率": f"{accuracy:.4f}" if accuracy != 'N/A' else 'N/A'
+        "准确率": f"{accuracy:.4f}" if accuracy != 'N/A' else 'N/A',
+        **text_processing_info
     }
 
     # 使用新的保存函数
     model_name = save_model_with_id(best_model, "classification", model_info)
     st.session_state.current_model_name = model_name
 
-    return best_model, model_comparison, model_name
+    # 生成文本可视化（如果有文本特征）
+    text_visualizations = {}
+    if preprocess_text and text_processing_info["文本列数量"] > 0:
+        # 为第一个文本列创建词云图
+        first_text_col = text_processing_info["处理的文本列"][0]
+        text_visualizations = create_text_visualizations(
+            processed_data[first_text_col],
+            labels=data[target_variable],
+            title=f"分类任务 - {first_text_col}"
+        )
+
+    return best_model, model_comparison, model_name, text_visualizations
 
 
-# 回归任务函数
-def regression_task(data, target_variable, train_size):
+# 支持文本的回归任务函数
+def regression_task(data, target_variable, train_size, preprocess_text=False, text_columns=None):
     from pycaret.regression import setup, compare_models, save_model, pull, predict_model
     from pycaret.regression import save_model as save_reg_model
 
-    setup(data=data, target=target_variable, train_size=train_size)
-    best_model = compare_models()
-    st.success("✅ 模型训练完成！")
+    # 处理文本预处理
+    processed_data = data.copy()
+    text_processing_info = {"文本列数量": 0, "处理的文本列": []}
+
+    if preprocess_text:
+        text_columns = text_columns or []
+
+        # 如果没有指定文本列，自动检测
+        if not text_columns:
+            text_columns = data.select_dtypes(include=['object']).columns.tolist()
+            text_columns = [col for col in text_columns if col != target_variable]
+
+        for col in text_columns:
+            if col in data.columns and col != target_variable:
+                st.info(f"正在预处理文本列: {col}")
+                processed_data[col] = preprocess_text_column(data[col])
+                text_processing_info["处理的文本列"].append(col)
+                text_processing_info["文本列数量"] += 1
+
+    # 设置回归环境
+    setup(data=processed_data, target=target_variable, train_size=train_size)
+
+    with st.spinner("正在训练和比较回归模型..."):
+        best_model = compare_models()
+    st.success("✅ 回归模型训练完成！")
 
     # 保存模型信息
     model_comparison = pull()
@@ -230,21 +578,38 @@ def regression_task(data, target_variable, train_size):
     r2 = model_comparison.loc['R2', best_model_name] if 'R2' in model_comparison.index else 'N/A'
     rmse = model_comparison.loc['RMSE', best_model_name] if 'RMSE' in model_comparison.index else 'N/A'
 
+    # 统计特征类型
+    numeric_features = len(processed_data.select_dtypes(include=[np.number]).columns) - 1  # 减去目标变量
+    text_features = len([col for col in processed_data.columns if processed_data[col].dtype == 'object' and col != target_variable])
+
     model_info = {
         "数据集大小": f"{len(data)} 行",
-        "特征数量": f"{len(data.columns) - 1} 个",
+        "数值特征数量": f"{numeric_features} 个",
+        "文本特征数量": f"{text_features} 个",
         "目标变量": target_variable,
         "训练集比例": f"{train_size:.1%}",
         "最佳模型": best_model_name,
         "R² 分数": f"{r2:.4f}" if r2 != 'N/A' else 'N/A',
-        "RMSE": f"{rmse:.4f}" if rmse != 'N/A' else 'N/A'
+        "RMSE": f"{rmse:.4f}" if rmse != 'N/A' else 'N/A',
+        **text_processing_info
     }
 
     # 使用新的保存函数
     model_name = save_model_with_id(best_model, "regression", model_info)
     st.session_state.current_model_name = model_name
 
-    return best_model, model_comparison, model_name
+    # 生成文本可视化（如果有文本特征）
+    text_visualizations = {}
+    if preprocess_text and text_processing_info["文本列数量"] > 0:
+        # 为第一个文本列创建词云图
+        first_text_col = text_processing_info["处理的文本列"][0]
+        text_visualizations = create_text_visualizations(
+            processed_data[first_text_col],
+            labels=data[target_variable],
+            title=f"回归任务 - {first_text_col}"
+        )
+
+    return best_model, model_comparison, model_name, text_visualizations
 
 
 # 预测函数
@@ -465,11 +830,47 @@ def main():
 
         # 数据基本信息
         numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
-        st.info(f"📈 **数据统计**: 数值型特征 {len(numeric_columns)} 个，总特征 {len(data.columns)} 个")
+        text_columns = data.select_dtypes(include=['object']).columns.tolist()
+        st.info(f"📈 **数据统计**: 数值型特征 {len(numeric_columns)} 个，文本特征 {len(text_columns)} 个，总特征 {len(data.columns)} 个")
 
         # 选择任务类型
         st.markdown("### ⚙️ 模型配置")
         task_type = st.selectbox("选择任务类型", ["分类", "回归", "聚类"])
+
+        # 文本处理选项
+        text_processing_available = len(text_columns) > 0
+        preprocess_text = False
+        selected_text_columns = []
+
+        if text_processing_available:
+            st.markdown("#### 📝 文本处理选项")
+            preprocess_text = st.checkbox("启用文本预处理", value=False,
+                                        help="对文本特征进行分词、停用词移除等预处理")
+
+            if preprocess_text:
+                text_processing_method = st.radio("文本处理方式", ["自动检测", "手动选择"],
+                                                help="自动检测语言类型或手动选择需要处理的文本列")
+
+                if text_processing_method == "手动选择":
+                    selected_text_columns = st.multiselect(
+                        "选择要处理的文本列",
+                        text_columns,
+                        default=text_columns,
+                        help="选择需要进行预处理的文本列"
+                    )
+                else:
+                    selected_text_columns = text_columns
+
+                # 文本预处理参数
+                col1, col2 = st.columns(2)
+                with col1:
+                    remove_stopwords = st.checkbox("移除停用词", value=True,
+                                                help="移除常见但无意义的词语")
+                with col2:
+                    min_word_length = st.number_input("最小词长度", min_value=1, max_value=5,
+                                                    value=2, help="过滤掉过短的词语")
+        else:
+            st.info("📝 数据中未检测到文本特征，文本预处理功能不可用")
 
         if task_type == "聚类":
             # 聚类任务特殊配置
@@ -485,16 +886,46 @@ def main():
                 help="K-means聚类的类别数量"
             )
 
-            # 特征选择
-            if numeric_columns:
+            # 文本聚类选项
+            include_text_features = False
+            if text_processing_available:
+                include_text_features = st.checkbox(
+                    "包含文本特征进行聚类",
+                    value=False,
+                    help="将文本特征转换为数值特征后用于聚类分析"
+                )
+
+                if include_text_features:
+                    clustering_text_method = st.radio(
+                        "聚类文本选择方式",
+                        ["使用所有文本特征", "手动选择"],
+                        help="选择用于聚类的文本特征"
+                    )
+
+                    if clustering_text_method == "手动选择":
+                        clustering_text_columns = st.multiselect(
+                            "选择用于聚类的文本特征",
+                            text_columns,
+                            default=text_columns[:1] if text_columns else [],
+                            help="选择用于聚类分析的文本特征"
+                        )
+                    else:
+                        clustering_text_columns = text_columns
+
+            # 特征选择（数值特征）
+            available_features = numeric_columns
+            if include_text_features and text_columns:
+                available_features = numeric_columns + text_columns
+
+            if available_features:
                 selected_features = st.multiselect(
-                    "选择用于聚类的特征 (留空则使用所有数值特征)",
-                    numeric_columns,
-                    default=numeric_columns[:min(5, len(numeric_columns))],  # 默认选择前5个特征
-                    help="选择用于聚类分析的数值型特征"
+                    "选择用于聚类的特征 (留空则自动选择)",
+                    available_features,
+                    default=available_features[:min(5, len(available_features))],  # 默认选择前5个特征
+                    help="选择用于聚类分析的特征，支持数值和文本特征"
                 )
             else:
-                st.warning("⚠️ 数据中没有数值型特征，无法进行聚类分析")
+                st.warning("⚠️ 数据中没有可用于聚类分析的特征")
                 selected_features = []
 
         else:
@@ -511,28 +942,40 @@ def main():
             st.session_state.clustered_data = None
         if 'visualizations' not in st.session_state:
             st.session_state.visualizations = None
+        if 'text_visualizations' not in st.session_state:
+            st.session_state.text_visualizations = None
+        if 'cluster_stats' not in st.session_state:
+            st.session_state.cluster_stats = None
 
         # 训练模型
         if st.button("🚀 开始训练模型", type="primary"):
             with st.spinner("正在训练模型，请稍候..."):
                 if task_type == "聚类":
-                    if not numeric_columns:
-                        st.error("❌ 没有数值型特征可用于聚类分析")
-                    else:
-                        model, clustered_data, model_name, visualizations, cluster_stats = clustering_task(
-                            data, n_clusters, selected_features)
-                        if model is not None:
-                            st.session_state.best_model = model
-                            st.session_state.clustered_data = clustered_data
-                            st.session_state.visualizations = visualizations
-                            st.session_state.cluster_stats = cluster_stats
+                    # 获取文本聚类参数
+                    clustering_text_cols = []
+                    if text_processing_available and include_text_features:
+                        clustering_text_cols = clustering_text_columns if 'clustering_text_columns' in locals() else text_columns
+
+                    model, clustered_data, model_name, visualizations, cluster_stats = clustering_task(
+                        data, n_clusters, selected_features, include_text_features, clustering_text_cols)
+                    if model is not None:
+                        st.session_state.best_model = model
+                        st.session_state.clustered_data = clustered_data
+                        st.session_state.visualizations = visualizations
+                        st.session_state.cluster_stats = cluster_stats
 
                 elif task_type == "分类":
-                    st.session_state.best_model, st.session_state.model_comparison, model_name = classification_task(
-                        data, target_variable, train_size)
+                    best_model, model_comparison, model_name, text_visualizations = classification_task(
+                        data, target_variable, train_size, preprocess_text, selected_text_columns)
+                    st.session_state.best_model = best_model
+                    st.session_state.model_comparison = model_comparison
+                    st.session_state.text_visualizations = text_visualizations
                 else:  # 回归
-                    st.session_state.best_model, st.session_state.model_comparison, model_name = regression_task(
-                        data, target_variable, train_size)
+                    best_model, model_comparison, model_name, text_visualizations = regression_task(
+                        data, target_variable, train_size, preprocess_text, selected_text_columns)
+                    st.session_state.best_model = best_model
+                    st.session_state.model_comparison = model_comparison
+                    st.session_state.text_visualizations = text_visualizations
 
         # 显示结果
         if task_type == "聚类" and st.session_state.clustered_data is not None:
@@ -579,6 +1022,17 @@ def main():
             st.markdown("### 📈 模型性能对比")
             st.dataframe(st.session_state.model_comparison)
 
+            # 显示文本可视化
+            if st.session_state.text_visualizations and len(st.session_state.text_visualizations) > 0:
+                st.markdown("### 📝 文本分析可视化")
+                viz_count = 0
+                for viz_name, viz_chart in st.session_state.text_visualizations.items():
+                    if viz_count < 6:  # 限制显示数量
+                        st.plotly_chart(viz_chart, use_container_width=True)
+                        viz_count += 1
+                    else:
+                        break
+
         # 预测功能
         st.markdown("---")
         st.markdown("### 🔮 模型预测")
@@ -613,11 +1067,15 @@ def main():
     - **分类任务**: 需要选择目标变量，用于预测类别
     - **回归任务**: 需要选择目标变量，用于预测数值
     - **聚类任务**: 自动发现数据中的群组，无需目标变量
+    - **文本处理**: 支持中英文文本预处理，包括分词、停用词移除等
+    - **文本聚类**: 可将文本特征转换为数值特征进行聚类分析
+    - **文本可视化**: 自动生成词云图等文本分析可视化
     - 支持的文件格式: CSV (.csv), Excel (.xlsx)
     - 模型会自动保存，不会覆盖之前的模型
     - 可以通过侧边栏导入/导出模型
     - 预测结果可以下载为CSV文件
     - 建议训练集比例设置在0.6-0.8之间（仅对分类和回归任务）
+    - 文本样例数据位于 `data/samples/text_*_sample.csv`
     """)
 
 

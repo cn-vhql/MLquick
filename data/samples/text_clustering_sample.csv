@@ -1,0 +1,51 @@
+text_content,source,length
+"人工智能和机器学习正在改变我们的生活方式，深度学习技术不断突破边界",科技文章,45
+"量子计算机的发展为科学研究带来新的可能性，量子纠缠现象令人着迷",科技文章,42
+"区块链技术在金融领域的应用越来越广泛，去中心化成为新趋势",科技文章,39
+"大数据分析帮助企业做出更明智的决策，数据驱动成为核心竞争力",科技文章,38
+"云计算服务为中小企业提供了强大的计算能力，降低了技术门槛",科技文章,38
+"AI and machine learning are transforming our daily lives, deep learning continues to push boundaries",tech_article,42
+"Quantum computing opens new possibilities for scientific research, quantum entanglement is fascinating",tech_article,42
+"Blockchain technology is increasingly applied in finance, decentralization is becoming the new trend",tech_article,41
+"Big data analytics helps businesses make smarter decisions, data-driven becomes core competitiveness",tech_article,40
+"Cloud computing provides powerful computing capabilities for SMEs, lowering technical barriers",tech_article,39
+"健康饮食是保持身体健康的重要因素，均衡营养摄入很关键",健康生活,35
+"适量运动可以增强体质，提高免疫力，预防各种疾病",健康生活,32
+"良好的睡眠质量对身心健康至关重要，规律作息有助于改善睡眠",健康生活,38
+"心理健康同样重要，学会压力管理和情绪调节",健康生活,28
+"定期体检可以及早发现健康问题，预防胜于治疗",健康生活,31
+"Healthy diet is an important factor in maintaining good health, balanced nutrition intake is crucial",health_living,36
+"Moderate exercise can strengthen physical fitness, enhance immunity, and prevent various diseases",health_living,37
+"Good sleep quality is crucial for physical and mental health, regular schedule helps improve sleep",health_living,39
+"Mental health is equally important, learn stress management and emotional regulation",health_living,33
+"Regular health check-ups can detect health problems early, prevention is better than cure",health_living,34
+"这款手机拍照效果真的很棒，夜景模式特别出色",产品评价,28
+"客服服务态度很好，解决问题很及时，点赞",产品评价,27
+"物流速度超快，包装也很精美，很满意",产品评价,26
+"产品质量不错，性价比很高，会推荐给朋友",产品评价,26
+"使用体验很好，界面设计简洁大方",产品评价,22
+"The camera quality of this phone is really great, night mode is particularly outstanding",product_review,32
+"Customer service attitude is very good, problem-solving is timely, thumbs up",product_review,30
+"Delivery speed is super fast, packaging is also exquisite, very satisfied",product_review,29
+"Good product quality and high cost-performance ratio, will recommend to friends",product_review,28
+"Great user experience, interface design is simple and elegant",product_review,24
+"最新经济数据显示消费市场正在回暖，投资者信心有所恢复",财经新闻,36
+"股市今日大幅上涨，科技股领涨，成交额创近期新高",财经新闻,32
+"央行降准释放流动性，支持实体经济发展",财经新闻,24
+"国际贸易谈判取得进展，全球市场预期向好",财经新闻,26
+"房价调控政策初见成效，多地房价开始趋于稳定",财经新闻,30
+"Latest economic data shows consumer market is recovering, investor confidence is gradually returning",finance_news,38
+"Stock market rose sharply today, tech stocks led the gains, trading volume hit recent high",finance_news,34
+"Central bank cut reserve requirements to release liquidity, supporting real economy development",finance_news,30
+"International trade negotiations make progress, global market outlook improves",finance_news,28
+"Housing price control policies show initial effects, prices in many regions begin to stabilize",finance_news,32
+"学习了新的编程技术，感觉很充实",个人日记,21
+"今天和朋友聚餐，聊了很多有趣的话题",个人日记,23
+"周末去了郊外徒步，风景很美心情很好",个人日记,25
+"读了一本好书，受益匪浅",个人日记,15
+"努力工作，为自己的梦想奋斗",个人日记,17
+"Learned new programming technology today, feel very fulfilled",personal_diary,21
+"Had dinner with friends today, talked about many interesting topics",personal_diary,23
+"Went hiking in the suburbs on weekend, beautiful scenery and good mood",personal_diary,25
+"Read a good book, benefited a lot",personal_diary,15
+"Work hard and fight for my dreams",personal_diary,17

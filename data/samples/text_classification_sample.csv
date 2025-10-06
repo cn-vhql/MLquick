@@ -1,0 +1,61 @@
+text,sentiment,category,rating
+"这个产品质量真的很不错，值得推荐",positive,产品评价,5
+"客服态度很好，解决问题很及时",positive,服务评价,5
+"物流速度快，包装也很好",positive,物流评价,5
+"性价比很高，会推荐给朋友",positive,产品评价,4
+"使用体验很好，操作简单",positive,产品评价,4
+"Amazing product! Highly recommended",positive,product_review,5
+"Excellent customer service",positive,service_review,5
+"Fast delivery and great packaging",positive,delivery_review,5
+"Great value for money",positive,product_review,4
+"Easy to use and very convenient",positive,product_review,4
+"质量一般般，价格偏贵",negative,产品评价,2
+"客服响应太慢，体验不好",negative,服务评价,1
+"物流太慢了等了很久",negative,物流评价,1
+"性价比不高，不推荐购买",negative,产品评价,2
+"使用起来比较复杂，不够友好",negative,产品评价,2
+"Poor quality for the price",negative,product_review,2
+"Terrible customer service",negative,service_review,1
+"Delivery was very slow",negative,delivery_review,1
+"Not worth the money",negative,product_review,2
+"Difficult to use, not user-friendly",negative,product_review,2
+"还可以吧，没有特别惊喜",neutral,产品评价,3
+"服务一般，有待改进",neutral,服务评价,3
+"物流正常，没有延迟",neutral,物流评价,3
+"价格合理，质量普通",neutral,产品评价,3
+"功能基本满足需求",neutral,产品评价,3
+"It's okay, nothing special",neutral,product_review,3
+"Average service, could be better",neutral,service_review,3
+"Normal delivery time",neutral,delivery_review,3
+"Reasonable price and decent quality",neutral,product_review,3
+"Basic features work as expected",neutral,product_review,3
+"产品设计很用心，细节处理得很好",positive,产品评价,4
+"客服团队很专业，回答很详细",positive,服务评价,5
+"包装很精美，送人很有面子",positive,产品评价,4
+"超出预期的好产品",positive,产品评价,5
+"会再次购买，支持国货",positive,产品评价,5
+"Well-designed product with great attention to detail",positive,product_review,4
+"Professional support team with detailed responses",positive,service_review,5
+"Beautiful packaging, perfect for gifts",positive,product_review,4
+"Exceeded my expectations",positive,product_review,5
+"Will buy again, support local brands",positive,product_review,5
+"失望，和描述差距很大",negative,产品评价,1
+"客服态度恶劣，不解决问题",negative,服务评价,1
+"包装破损，产品受损",negative,物流评价,1
+"完全不推荐，浪费钱",negative,产品评价,1
+"质量问题严重，不敢用",negative,产品评价,1
+"Very disappointed, not as described",negative,product_review,1
+"Rude customer service, no help",negative,service_review,1
+"Damaged packaging, product affected",negative,delivery_review,1
+"Would not recommend, waste of money",negative,product_review,1
+"Serious quality issues, unsafe to use",negative,product_review,1
+"整体感觉还不错，可以考虑",neutral,产品评价,3
+"服务态度还行，响应速度一般",neutral,服务评价,3
+"物流速度正常，包装完整",neutral,物流评价,3
+"产品功能基本够用",neutral,产品评价,3
+"价格在这个水平算是合理的",neutral,产品评价,3
+"Overall pretty decent, worth considering",neutral,product_review,3
+"Service attitude is okay, response time is average",neutral,service_review,3
+"Normal delivery speed, intact packaging",neutral,delivery_review,3
+"Product functions are basically adequate",neutral,product_review,3
+"The price is reasonable for this level",neutral,product_review,3
