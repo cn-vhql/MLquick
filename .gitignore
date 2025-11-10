@@ -2,7 +2,11 @@
 __pycache__/
 *.py[cod]
 *$py.class
-MLquick-GUI/
+MLquick-GUI
+CLAUDE.md
+docs
+hooks
+run.py
 
 # C extensions
 *.so
@@ -217,3 +221,5 @@ pycaret_log/
 *.temp
 *.bak
 *.backup
+pyproject.toml
+hooks/hook-streamlit.py
