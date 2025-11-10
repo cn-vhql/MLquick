@@ -223,3 +223,4 @@ pycaret_log/
 *.backup
 pyproject.toml
 hooks/hook-streamlit.py
+data/samples/classification_sample.csv

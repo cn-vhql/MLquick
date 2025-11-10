@@ -302,6 +302,19 @@ wheels = [
 ]
 
 [[package]]
+name = "customtkinter"
+version = "5.2.2"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+dependencies = [
+    { name = "darkdetect" },
+    { name = "packaging" },
+]
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/cf/48/c5a9d44188c44702e1e3db493c741e9c779596835a761b819fe15431d163/customtkinter-5.2.2.tar.gz", hash = "sha256:fd8db3bafa961c982ee6030dba80b4c2e25858630756b513986db19113d8d207", size = 261999, upload-time = "2024-01-10T02:24:36.314Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/3b/b1/b43b33001a77256b335511e75f257d001082350b8506c8807f30c98db052/customtkinter-5.2.2-py3-none-any.whl", hash = "sha256:14ad3e7cd3cb3b9eb642b9d4e8711ae80d3f79fb82545ad11258eeffb2e6b37c", size = 296062, upload-time = "2024-01-10T02:24:33.53Z" },
+]
+
+[[package]]
 name = "cycler"
 version = "0.12.1"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
@@ -342,6 +355,15 @@ wheels = [
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/9c/84/9b8112160cab922b97edef00616ed18771567d88b5ba9d30d1736880c345/cython-3.2.0-cp39-abi3-win32.whl", hash = "sha256:c9fd986413fc52929b916187630a9abab9f876299951488c4b905ad5346afee6", size = 2430852, upload-time = "2025-11-05T13:36:23.049Z" },
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/8f/57/65d3de140b51c45dd6892846bfabdfaaa032e2418f1cb1a2f46058c1fe42/cython-3.2.0-cp39-abi3-win_arm64.whl", hash = "sha256:ee2ea79ddeb721f912e7efea039b9db059c81767ff04fbf9a995f64e1187df99", size = 2435793, upload-time = "2025-11-05T13:36:25.139Z" },
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/20/58/1f798ddb7fe6bfddf85f4f97d2d4ad63a491a7b643e85c1e274d0f09138e/cython-3.2.0-py3-none-any.whl", hash = "sha256:73f7f4c75acde5b5b4df05b11fdc2705ec637b99241d1bc2f4ebf345f7a2ea90", size = 1252818, upload-time = "2025-11-05T13:35:00.391Z" },
+]
+
+[[package]]
+name = "darkdetect"
+version = "0.8.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/45/77/7575be73bf12dee231d0c6e60ce7fb7a7be4fcd58823374fc59a6e48262e/darkdetect-0.8.0.tar.gz", hash = "sha256:b5428e1170263eb5dea44c25dc3895edd75e6f52300986353cd63533fe7df8b1", size = 7681, upload-time = "2022-12-16T14:14:42.113Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/f2/f2/728f041460f1b9739b85ee23b45fa5a505962ea11fd85bdbe2a02b021373/darkdetect-0.8.0-py3-none-any.whl", hash = "sha256:a7509ccf517eaad92b31c214f593dbcf138ea8a43b2935406bbd565e15527a85", size = 8955, upload-time = "2022-12-16T14:14:40.92Z" },
 ]
 
 [[package]]
@@ -987,12 +1009,14 @@ name = "mlquick"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "customtkinter" },
     { name = "jieba" },
     { name = "matplotlib" },
     { name = "nltk" },
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
+    { name = "pillow" },
     { name = "plotly", version = "5.24.1", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "plotly", version = "6.4.0", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "python_full_version < '3.13'" },
     { name = "psutil" },
@@ -1006,15 +1030,17 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "customtkinter", specifier = ">=5.0.0" },
     { name = "jieba", specifier = ">=0.42.1" },
     { name = "matplotlib", specifier = ">=3.5.0" },
     { name = "nltk", specifier = ">=3.8.0" },
-    { name = "numpy", specifier = ">=1.26.4" },
+    { name = "numpy", specifier = ">=1.21.0" },
     { name = "openpyxl", specifier = ">=3.0.0" },
     { name = "pandas", specifier = ">=1.3.0" },
+    { name = "pillow", specifier = ">=8.0.0" },
     { name = "plotly", specifier = ">=5.0.0" },
     { name = "psutil", specifier = ">=5.8.0" },
-    { name = "pycaret", specifier = "==3.3.2" },
+    { name = "pycaret", specifier = ">=3.3.2" },
     { name = "pyinstaller", specifier = ">=5.0.0" },
     { name = "scikit-learn", specifier = ">=1.1.0" },
     { name = "seaborn", specifier = ">=0.11.0" },
