@@ -7,6 +7,10 @@ CLAUDE.md
 docs
 hooks
 run.py
+test_output
+test_reports
+docs
+.claude
 
 # C extensions
 *.so
