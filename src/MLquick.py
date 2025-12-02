@@ -38,7 +38,99 @@ except ImportError:
 
 # 抑制jieba的日志输出
 import logging
+
+# 配置MLquick日志系统
+def setup_mlquick_logger():
+    """设置MLquick应用程序的日志系统"""
+
+    # 创建日志目录
+    log_dir = "../logs"
+    os.makedirs(log_dir, exist_ok=True)
+
+    # 生成日志文件名（包含日期）
+    log_filename = f"{log_dir}/mlquick_{datetime.now().strftime('%Y%m%d')}.log"
+
+    # 配置日志格式
+    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s'
+    date_format = '%Y-%m-%d %H:%M:%S'
+
+    # 创建日志记录器
+    logger = logging.getLogger('MLquick')
+    logger.setLevel(logging.DEBUG)
+
+    # 清除现有处理器
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+
+    # 文件处理器（按天轮转）
+    file_handler = logging.FileHandler(log_filename, encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
+    file_formatter = logging.Formatter(log_format, date_format)
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
+
+    # 控制台处理器（只显示重要信息）
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.WARNING)  # 只显示警告和错误
+    console_formatter = logging.Formatter('%(levelname)s - %(message)s')
+    console_handler.setFormatter(console_formatter)
+    logger.addHandler(console_handler)
+
+    return logger
+
+# 创建全局日志记录器
+mlquick_logger = setup_mlquick_logger()
+
+# 抑制jieba的日志输出
 jieba.setLogLevel(logging.INFO)
+
+def log_info(message):
+    """记录信息日志"""
+    mlquick_logger.info(message)
+
+def log_warning(message):
+    """记录警告日志"""
+    mlquick_logger.warning(message)
+
+def log_error(message):
+    """记录错误日志"""
+    mlquick_logger.error(message)
+
+def log_debug(message):
+    """记录调试日志"""
+    mlquick_logger.debug(message)
+
+def log_operation(operation, details=None):
+    """记录操作日志"""
+    if details:
+        log_info(f"OPERATION: {operation} - {details}")
+    else:
+        log_info(f"OPERATION: {operation}")
+
+def log_model_action(action, model_name, details=None):
+    """记录模型相关操作"""
+    if details:
+        log_info(f"MODEL_ACTION: {action} - Model: {model_name} - {details}")
+    else:
+        log_info(f"MODEL_ACTION: {action} - Model: {model_name}")
+
+def log_data_info(operation, data_shape=None, columns=None):
+    """记录数据处理信息"""
+    info = f"DATA_OPERATION: {operation}"
+    if data_shape:
+        info += f" - Shape: {data_shape}"
+    if columns:
+        info += f" - Columns: {len(columns) if isinstance(columns, list) else columns}"
+    log_info(info)
+
+def log_text_processing(operation, text_length=None, details=None):
+    """记录文本处理信息"""
+    info = f"TEXT_PROCESSING: {operation}"
+    if text_length:
+        info += f" - Length: {text_length}"
+    if details:
+        info += f" - {details}"
+    log_info(info)
 
 
 def get_chinese_font_path():
@@ -110,23 +202,30 @@ def preprocess_text_column(series, language="auto", remove_stopwords=True, min_w
     - remove_stopwords: 是否移除停用词
     - min_word_length: 最小词长度
     """
-    processed_texts = []
+    log_text_processing("开始文本预处理", text_length=len(series),
+                    details=f"Language: {language}, Remove stopwords: {remove_stopwords}, Min word length: {min_word_length}")
 
-    for text in series:
+    processed_texts = []
+    total_text = len(series)
+    processed_count = 0
+    empty_count = 0
+
+    for i, text in enumerate(series):
         if pd.isna(text) or text == "":
             processed_texts.append("")
+            empty_count += 1
             continue
 
-        text = str(text).strip()
+        original_text = str(text).strip()
 
         # 自动检测语言
         if language == "auto":
-            detected_lang = detect_language(text)
+            detected_lang = detect_language(original_text)
         else:
             detected_lang = language
 
         # 清理文本
-        text = re.sub(r'[^\w\s\u4e00-\u9fff]', ' ', text)  # 保留中英文和数字
+        text = re.sub(r'[^\w\s\u4e00-\u9fff]', ' ', original_text)  # 保留中英文和数字
         text = re.sub(r'\s+', ' ', text)  # 合并多个空格
 
         if detected_lang == "chinese":
@@ -136,9 +235,12 @@ def preprocess_text_column(series, language="auto", remove_stopwords=True, min_w
             # 移除停用词（基础中文停用词）
             if remove_stopwords:
                 chinese_stopwords = {'的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这'}
+                original_len = len(words)
                 words = [word for word in words if word not in chinese_stopwords and len(word) >= min_word_length]
+                filtered_len = len(words)
 
             processed_text = ' '.join(words)
+            log_debug(f"中文文本处理 - 原始词数: {original_len}, 处理后词数: {filtered_len}")
 
         else:
             # 英文处理
@@ -149,17 +251,31 @@ def preprocess_text_column(series, language="auto", remove_stopwords=True, min_w
             if remove_stopwords and NLTK_AVAILABLE:
                 try:
                     stop_words = set(stopwords.words('english'))
+                    original_len = len(words)
                     words = [word for word in words if word not in stop_words and len(word) >= min_word_length]
+                    filtered_len = len(words)
                 except:
                     # 如果nltk数据未下载，使用基础停用词
                     basic_stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them'}
+                    original_len = len(words)
                     words = [word for word in words if word not in basic_stopwords and len(word) >= min_word_length]
+                    filtered_len = len(words)
 
             processed_text = ' '.join(words)
+            log_debug(f"英文文本处理 - 原始词数: {original_len}, 处理后词数: {filtered_len}")
 
         processed_texts.append(processed_text)
+        processed_count += 1
 
-    return pd.Series(processed_texts)
+        # 每100个文本记录一次进度
+        if (i + 1) % 100 == 0:
+            log_info(f"文本预处理进度: {i + 1}/{total_text}")
+
+    result_series = pd.Series(processed_texts)
+    log_text_processing("文本预处理完成",
+                    details=f"总计: {total_text}, 处理成功: {processed_count}, 空文本: {empty_count}")
+
+    return result_series
 
 
 def extract_text_features(text_data, max_features=1000, method="tfidf"):
@@ -170,6 +286,19 @@ def extract_text_features(text_data, max_features=1000, method="tfidf"):
     - max_features: 最大特征数
     - method: "tfidf" 或 "count"
     """
+    log_text_processing(f"开始文本特征提取",
+                    details=f"Method: {method}, Max features: {max_features}, Text samples: {len(text_data)}")
+
+    # 过滤空文本
+    non_empty_texts = text_data.dropna()
+    non_empty_texts = non_empty_texts[non_empty_texts.str.strip() != '']
+
+    if len(non_empty_texts) == 0:
+        log_error("没有有效的文本数据进行特征提取")
+        return None, None, None
+
+    log_text_processing(f"有效文本数量: {len(non_empty_texts)}, 空文本数量: {len(text_data) - len(non_empty_texts)}")
+
     if method == "tfidf":
         vectorizer = TfidfVectorizer(
             max_features=max_features,
@@ -186,10 +315,19 @@ def extract_text_features(text_data, max_features=1000, method="tfidf"):
         )
 
     try:
-        features = vectorizer.fit_transform(text_data)
+        features = vectorizer.fit_transform(non_empty_texts)
         feature_names = vectorizer.get_feature_names_out()
+
+        log_text_processing(f"特征提取完成",
+                        details=f"特征矩阵形状: {features.shape}, 特征数量: {len(feature_names)}")
+
+        # 记录一些特征示例
+        sample_features = list(feature_names[:10])  # 前10个特征
+        log_debug(f"特征示例: {sample_features}")
+
         return features, feature_names, vectorizer
     except Exception as e:
+        log_error(f"文本特征提取失败: {str(e)}")
         st.error(f"文本特征提取失败: {str(e)}")
         return None, None, None
 
@@ -437,9 +575,16 @@ def clustering_task(data, n_clusters, features=None, include_text_features=False
     from pycaret.clustering import setup, create_model, assign_model, pull, plot_model
     from pycaret.clustering import save_model as save_cluster_model
 
+    log_operation("开始聚类任务",
+                 details=f"数据形状: {data.shape}, 聚类数: {n_clusters}, 包含文本特征: {include_text_features}")
+
     # 分离数值和文本特征
     numeric_data = data.select_dtypes(include=[np.number])
     text_data = pd.DataFrame()
+
+    log_data_info("数据分离",
+                 data_shape=data.shape,
+                 columns=f"数值列: {len(numeric_data.columns)}, 对象列: {len(data.select_dtypes(include=['object']).columns)}")
 
     # 处理文本特征
     if include_text_features:
@@ -450,8 +595,11 @@ def clustering_task(data, n_clusters, features=None, include_text_features=False
             text_columns = data.select_dtypes(include=['object']).columns.tolist()
             text_columns = [col for col in text_columns if col not in features] if features else text_columns
 
+        log_info(f"检测到的文本列: {text_columns}")
+
         for col in text_columns:
             if col in data.columns:
+                log_text_processing(f"处理文本列: {col}")
                 st.info(f"正在处理文本列: {col}")
                 processed_text = preprocess_text_column(data[col])
                 text_data[col] = processed_text
@@ -517,21 +665,35 @@ def clustering_task(data, n_clusters, features=None, include_text_features=False
                 from sklearn.decomposition import PCA
                 pca = PCA(n_components=50, random_state=123)
                 numeric_cols = combined_data.select_dtypes(include=[np.number]).columns
+                original_shape = combined_data[numeric_cols].shape
                 combined_data[numeric_cols] = pca.fit_transform(combined_data[numeric_cols])
+                log_data_info("PCA降维",
+                             data_shape=f"原形状: {original_shape} -> 新形状: {combined_data[numeric_cols].shape}",
+                             columns=f"降维后特征数: {combined_data.shape[1]}")
                 st.info(f"🔧 特征维度已降维至50维以优化性能")
 
+    log_data_info("最终数据准备完成",
+                 data_shape=combined_data.shape,
+                 columns=f"最终特征数: {combined_data.shape[1]}")
+
     # 设置聚类环境
+    log_operation("设置PyCaret聚类环境")
     with st.spinner("正在设置聚类环境..."):
         setup(data=combined_data, session_id=123, normalize=True, verbose=False)
+    log_info("PyCaret聚类环境设置完成")
 
     # 创建K-means模型
+    log_operation(f"训练K-means模型", details=f"聚类数: {n_clusters}")
     with st.spinner("正在训练K-means聚类模型..."):
         kmeans_model = create_model('kmeans', num_clusters=n_clusters)
 
+    log_model_action("K-means模型训练完成", f"K-means_{n_clusters}clusters")
     st.success("✅ 聚类模型训练完成！")
 
     # 分配聚类标签
+    log_operation("分配聚类标签")
     clustered_data = assign_model(kmeans_model)
+    log_info(f"聚类分配完成，聚类结果形状: {clustered_data.shape}")
 
     # 创建可视化
     visualizations = create_clustering_visualizations(numeric_data, clustered_data['Cluster'], n_clusters)
@@ -925,25 +1087,44 @@ def main():
     uploaded_file = st.file_uploader("📁 上传数据集 (CSV 或 Excel格式)", type=["csv", "xlsx"])
 
     if uploaded_file is not None:
-        # 判断文件类型并读取数据
-        if uploaded_file.name.endswith('.csv'):
-            data = pd.read_csv(uploaded_file, encoding='utf-8-sig')
-        elif uploaded_file.name.endswith('.xlsx'):
-            data = pd.read_excel(uploaded_file, engine='openpyxl')
+        log_operation("用户上传数据文件", details=f"文件名: {uploaded_file.name}, 文件大小: {uploaded_file.size/1024:.2f} KB")
 
-        data = pd.DataFrame(data)
-        st.markdown("### 📊 数据预览")
-        st.write(f"数据形状: {data.shape[0]} 行 × {data.shape[1]} 列")
-        st.dataframe(data.head(10))
+        # 判断文件类型并读取数据
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                log_info("开始读取CSV文件")
+                data = pd.read_csv(uploaded_file, encoding='utf-8-sig')
+            elif uploaded_file.name.endswith('.xlsx'):
+                log_info("开始读取Excel文件")
+                data = pd.read_excel(uploaded_file, engine='openpyxl')
+
+            data = pd.DataFrame(data)
+            log_data_info("数据文件读取完成", data_shape=data.shape)
+
+            st.markdown("### 📊 数据预览")
+            st.write(f"数据形状: {data.shape[0]} 行 × {data.shape[1]} 列")
+            st.dataframe(data.head(10))
+
+        except Exception as e:
+            st.error(f"读取文件时出错: {str(e)}")
+            log_error(f"文件读取错误: {str(e)}")
+            return
 
         # 数据基本信息
         numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
         text_columns = data.select_dtypes(include=['object']).columns.tolist()
+
+        log_data_info("数据上传完成",
+                     data_shape=data.shape,
+                     columns=f"数值型: {len(numeric_columns)}, 文本型: {len(text_columns)}, 总计: {len(data.columns)}")
+
         st.info(f"📈 **数据统计**: 数值型特征 {len(numeric_columns)} 个，文本特征 {len(text_columns)} 个，总特征 {len(data.columns)} 个")
 
         # 选择任务类型
         st.markdown("### ⚙️ 模型配置")
         task_type = st.selectbox("选择任务类型", ["分类", "回归", "聚类"])
+
+        log_operation("用户选择任务类型", details=f"任务类型: {task_type}")
 
         # 文本处理选项
         text_processing_available = len(text_columns) > 0
@@ -1061,33 +1242,56 @@ def main():
 
         # 训练模型
         if st.button("🚀 开始训练模型", type="primary"):
+            log_operation("用户点击开始训练模型", details=f"任务类型: {task_type}")
+
             with st.spinner("正在训练模型，请稍候..."):
-                if task_type == "聚类":
-                    # 获取文本聚类参数
-                    clustering_text_cols = []
-                    if text_processing_available and include_text_features:
-                        clustering_text_cols = clustering_text_columns if 'clustering_text_columns' in locals() else text_columns
+                try:
+                    if task_type == "聚类":
+                        # 获取文本聚类参数
+                        clustering_text_cols = []
+                        if text_processing_available and include_text_features:
+                            clustering_text_cols = clustering_text_columns if 'clustering_text_columns' in locals() else text_columns
 
-                    model, clustered_data, model_name, visualizations, cluster_stats = clustering_task(
-                        data, n_clusters, selected_features, include_text_features, clustering_text_cols)
-                    if model is not None:
-                        st.session_state.best_model = model
-                        st.session_state.clustered_data = clustered_data
-                        st.session_state.visualizations = visualizations
-                        st.session_state.cluster_stats = cluster_stats
+                        model, clustered_data, model_name, visualizations, cluster_stats = clustering_task(
+                            data, n_clusters, selected_features, include_text_features, clustering_text_cols)
+                        if model is not None:
+                            log_model_action("聚类模型训练成功", model_name)
+                            st.session_state.best_model = model
+                            st.session_state.clustered_data = clustered_data
+                            st.session_state.visualizations = visualizations
+                            st.session_state.cluster_stats = cluster_stats
+                        else:
+                            log_error("聚类模型训练失败")
 
-                elif task_type == "分类":
-                    best_model, model_comparison, model_name, text_visualizations = classification_task(
-                        data, target_variable, train_size, preprocess_text, selected_text_columns)
-                    st.session_state.best_model = best_model
-                    st.session_state.model_comparison = model_comparison
-                    st.session_state.text_visualizations = text_visualizations
-                else:  # 回归
-                    best_model, model_comparison, model_name, text_visualizations = regression_task(
-                        data, target_variable, train_size, preprocess_text, selected_text_columns)
-                    st.session_state.best_model = best_model
-                    st.session_state.model_comparison = model_comparison
-                    st.session_state.text_visualizations = text_visualizations
+                    elif task_type == "分类":
+                        log_operation("开始分类模型训练", details=f"目标变量: {target_variable}, 训练集比例: {train_size}")
+                        best_model, model_comparison, model_name, text_visualizations = classification_task(
+                            data, target_variable, train_size, preprocess_text, selected_text_columns)
+                        if best_model is not None:
+                            log_model_action("分类模型训练成功", model_name)
+                            st.session_state.best_model = best_model
+                            st.session_state.model_comparison = model_comparison
+                            st.session_state.text_visualizations = text_visualizations
+                        else:
+                            log_error("分类模型训练失败")
+
+                    else:  # 回归
+                        log_operation("开始回归模型训练", details=f"目标变量: {target_variable}, 训练集比例: {train_size}")
+                        best_model, model_comparison, model_name, text_visualizations = regression_task(
+                            data, target_variable, train_size, preprocess_text, selected_text_columns)
+                        if best_model is not None:
+                            log_model_action("回归模型训练成功", model_name)
+                            st.session_state.best_model = best_model
+                            st.session_state.model_comparison = model_comparison
+                            st.session_state.text_visualizations = text_visualizations
+                        else:
+                            log_error("回归模型训练失败")
+
+                    log_info("模型训练流程完成")
+
+                except Exception as e:
+                    log_error(f"模型训练过程中发生异常: {str(e)}")
+                    st.error(f"模型训练失败: {str(e)}")
 
         # 显示结果
         if task_type == "聚类" and st.session_state.clustered_data is not None:
