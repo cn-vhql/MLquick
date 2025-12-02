@@ -37,7 +37,8 @@ except ImportError:
     st.warning("⚠️ NLTK未安装，英文文本处理功能受限")
 
 # 抑制jieba的日志输出
-jieba.setLogLevel(jieba.logging.INFO)
+import logging
+jieba.setLogLevel(logging.INFO)
 
 
 def get_chinese_font_path():
@@ -64,7 +65,7 @@ def get_chinese_font_path():
     # 如果直接路径不存在，尝试通过字体管理器查找
     try:
         font_manager = fm.FontManager()
-        fonts = font_manager.ttflist
+        fonts = font_manager.ttflist if hasattr(font_manager, 'ttflist') else []
 
         # 寻找中文字体
         for font in fonts:
@@ -217,7 +218,6 @@ def create_text_visualizations(text_data, labels=None, title="文本分析"):
                     max_words=100,
                     font_path=chinese_font_path,  # 使用自动检测的中文字体
                     colormap='viridis',
-                    relative_scaling=0.5,
                     min_font_size=10,
                     prefer_horizontal=0.9,
                     scale=2
@@ -230,7 +230,6 @@ def create_text_visualizations(text_data, labels=None, title="文本分析"):
                     background_color='white',
                     max_words=100,
                     colormap='viridis',
-                    relative_scaling=0.5,
                     min_font_size=10,
                     prefer_horizontal=0.9,
                     scale=2
@@ -283,7 +282,6 @@ def create_text_visualizations(text_data, labels=None, title="文本分析"):
                             background_color='white',
                             max_words=50,
                             font_path=chinese_font_path,  # 使用自动检测的中文字体
-                            relative_scaling=0.5,
                             min_font_size=8,
                             prefer_horizontal=0.9,
                             scale=2
@@ -294,7 +292,6 @@ def create_text_visualizations(text_data, labels=None, title="文本分析"):
                             height=300,
                             background_color='white',
                             max_words=50,
-                            relative_scaling=0.5,
                             min_font_size=8,
                             prefer_horizontal=0.9,
                             scale=2
@@ -498,8 +495,13 @@ def clustering_task(data, n_clusters, features=None, include_text_features=False
                 )
                 if features_matrix is not None:
                     # 转换为DataFrame
+                    if hasattr(features_matrix, 'toarray'):
+                        features_array = features_matrix.toarray()
+                    else:
+                        features_array = features_matrix
+
                     text_features_df = pd.DataFrame(
-                        features_matrix.toarray(),
+                        features_array,
                         columns=[f"{col}_{name}" for name in names]
                     )
                     all_text_features.append(text_features_df)
@@ -745,7 +747,7 @@ def prediction(model_path, prediction_file):
                 numeric_prediction_data = prediction_data.select_dtypes(include=[np.number])
 
                 # 进行聚类预测
-                clustered_prediction = assign_model(loaded_model, data=numeric_prediction_data)
+                clustered_prediction = assign_model(loaded_model, numeric_prediction_data)
                 st.success("✅ 聚类预测完成！")
                 st.write("聚类结果：")
                 st.dataframe(clustered_prediction)
@@ -977,6 +979,10 @@ def main():
                                                     value=2, help="过滤掉过短的词语")
         else:
             st.info("📝 数据中未检测到文本特征，文本预处理功能不可用")
+
+        # Initialize variables that might be referenced later
+        include_text_features = False
+        clustering_text_columns = []
 
         if task_type == "聚类":
             # 聚类任务特殊配置
