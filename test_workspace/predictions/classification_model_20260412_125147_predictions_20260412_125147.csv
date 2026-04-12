@@ -1,0 +1,11 @@
+﻿age,income,education_level,years_experience,has_credit_card,marital_status,prediction_label,prediction_score
+25,45000,Bachelor,2,Yes,Single,Electronics,0.5369
+34,62000,Master,5,Yes,Married,Electronics,0.6712
+28,38000,High School,1,No,Single,Books,0.7431
+45,85000,Master,15,Yes,Married,Clothing,0.8609
+31,55000,Bachelor,4,Yes,Single,Books,0.6061
+38,72000,PhD,10,Yes,Married,Books,0.6317
+22,28000,High School,0,No,Single,Books,0.7685
+41,68000,Master,12,Yes,Married,Clothing,0.6513
+29,42000,Bachelor,3,No,Single,Electronics,0.6447
+35,58000,Bachelor,6,Yes,Married,Electronics,0.6644
