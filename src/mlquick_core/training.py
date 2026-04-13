@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 from pathlib import Path
 from typing import Callable
+import warnings
 
 import pandas as pd
 from sklearn.metrics import silhouette_score
@@ -71,6 +72,24 @@ class TrainingService:
             return {}
         first_row = comparison.iloc[0].to_dict()
         return {key: value for key, value in first_row.items() if key not in {"index", "Model"}}
+
+    def _detect_unavailable_supervised_models(self, task_type: str) -> list[str]:
+        unavailable: list[str] = []
+
+        # Detect whether optional gradient boosting backends are usable in current runtime
+        # (especially in bundled onefile environments).
+        try:
+            import xgboost  # noqa: F401
+        except Exception:
+            unavailable.append("xgboost")
+        try:
+            import lightgbm  # noqa: F401
+        except Exception:
+            unavailable.append("lightgbm")
+
+        # Keep only ids that PyCaret may use for this task.
+        supported_ids = {"xgboost", "lightgbm"} if task_type in {"classification", "regression"} else set()
+        return [model_id for model_id in unavailable if model_id in supported_ids]
 
     def _format_metrics(self, metrics: dict[str, object]) -> list[str]:
         lines: list[str] = []
@@ -398,7 +417,10 @@ class TrainingService:
             if not config.manual_model_id:
                 raise ValueError("手动模式下必须指定模型。")
             self._emit(progress, f"正在训练手动指定模型: {config.manual_model_id}")
-            model = create_model(config.manual_model_id, verbose=False)
+            try:
+                model = create_model(config.manual_model_id, verbose=False)
+            except Exception as exc:
+                raise ValueError(f"指定模型不可用或依赖缺失: {config.manual_model_id} ({exc})") from exc
             metrics_table = self._normalize_comparison_table(pull())
             summary_row = self._extract_summary_row(metrics_table)
             comparison = pd.DataFrame([summary_row.to_dict()])
@@ -407,7 +429,18 @@ class TrainingService:
 
         self._emit(progress, "正在计算模型排行榜...")
         # 保留 PyCaret 对比输出的完整明细（所有候选模型、全部指标列）。
-        best_model = compare_models(sort=score_key, n_select=1, turbo=False, verbose=False)
+        exclude_models = self._detect_unavailable_supervised_models(config.task_type)
+        if exclude_models:
+            self._emit(progress, f"检测到不可用模型依赖，已自动排除: {', '.join(exclude_models)}")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            best_model = compare_models(
+                sort=score_key,
+                n_select=1,
+                turbo=False,
+                verbose=False,
+                exclude=exclude_models or None,
+            )
         comparison = self._normalize_comparison_table(pull())
         if comparison.empty:
             raise ValueError("PyCaret 模型对比结果为空，请检查数据或配置。")

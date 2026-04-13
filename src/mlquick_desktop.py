@@ -8,7 +8,7 @@ import tempfile
 
 import pandas as pd
 from PySide6.QtCore import QEvent, QThread, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QPixmap
+from PySide6.QtGui import QDesktopServices, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -71,6 +71,11 @@ def resolve_app_dir() -> Path:
 
 
 APP_DIR = resolve_app_dir()
+
+
+def asset_path(*parts: str) -> Path:
+    base_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+    return base_dir.joinpath("assets", *parts)
 
 
 def dataframe_to_table(table: QTableWidget, data: pd.DataFrame | None) -> None:
@@ -198,6 +203,9 @@ class DesktopMainWindow(QMainWindow):
         self.app_mode: str = "train"
 
         self.setWindowTitle("MLquick 桌面版")
+        app_icon = asset_path("mlquick-logo.ico")
+        if app_icon.exists():
+            self.setWindowIcon(QIcon(str(app_icon)))
         self.resize(1180, 700)
         self.setMinimumSize(1080, 660)
         self._apply_styles()
@@ -429,7 +437,9 @@ class DesktopMainWindow(QMainWindow):
         brand_logo.setProperty("brandLogo", True)
         brand_logo.setFixedSize(42, 42)
         brand_logo.setAlignment(Qt.AlignCenter)
-        logo_path = Path(__file__).resolve().parents[1] / "assets" / "mlquick-logo.svg"
+        logo_path = asset_path("mlquick-logo.png")
+        if not logo_path.exists():
+            logo_path = asset_path("mlquick-logo.svg")
         if logo_path.exists():
             logo_pixmap = QPixmap(str(logo_path))
             if not logo_pixmap.isNull():
