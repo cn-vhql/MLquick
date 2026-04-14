@@ -22,6 +22,7 @@
 - 📊 **可视化分析**: 聚类结果多维度可视化展示
 
 ## ✨ 应用截图
+
 ![alt text](/data/png/image-1.png)
 ![alt text](/data/png/image-2.png)
 ![alt text](/data/png/image-3.png)
@@ -54,37 +55,44 @@
 ## 🚀 快速开始
 
 ### 前置要求
+
 - Python 3.7+
 - pip 包管理器
 
 ### 1. 克隆项目
+
 ```bash
 git clone https://github.com/yourusername/MLquick.git
 cd MLquick
 ```
 
 ### 2. 创建虚拟环境
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
 
 ### 3. 安装依赖
+
 ```bash
 pip install -r requirements.txt
 ```
 
 ### 4. 运行应用
+
 ```bash
 streamlit run src/MLquick.py
 ```
 
 ### 5. 访问应用
+
 打开浏览器访问 `http://localhost:8501`
 
 ## 📦 安装说明
 
 ### 创建 requirements.txt
+
 ```bash
 # 核心依赖
 streamlit==1.49.1
@@ -105,6 +113,7 @@ plotly>=5.0.0    # 交互式图表
 ```
 
 ### Docker 部署
+
 ```dockerfile
 FROM python:3.9-slim
 
@@ -121,11 +130,13 @@ CMD ["streamlit", "run", "src/MLquick.py"]
 ## 📖 使用指南
 
 ### 1. 数据准备
+
 - 支持格式: CSV, Excel (.xlsx, .xls)
 - 数据要求: 无缺失值，特征列清晰
 - 文件大小: 建议 < 100MB
 
 ### 2. 模型训练流程
+
 ```
 上传数据 → 选择任务类型 → 设置目标变量 → 配置训练参数 → 训练模型 → 查看结果
 ```
@@ -133,16 +144,19 @@ CMD ["streamlit", "run", "src/MLquick.py"]
 ### 3. 详细步骤
 
 #### 步骤1: 数据上传
+
 - 点击"上传数据集"按钮
 - 选择CSV或Excel文件
 - 系统自动显示数据预览
 
 #### 步骤2: 任务配置
+
 - **任务类型**: 选择"分类"或"回归"
 - **目标变量**: 从下拉列表选择预测目标
 - **训练集比例**: 设置0.6-0.8之间，推荐0.7
 
 #### 步骤3: 模型训练
+
 - 点击"训练模型"按钮
 - 系统自动执行以下步骤：
   - 数据预处理
@@ -152,11 +166,13 @@ CMD ["streamlit", "run", "src/MLquick.py"]
   - 最佳模型选择
 
 #### 步骤4: 结果分析
+
 - 查看模型对比表格
 - 最佳模型信息
 - 性能指标详情
 
 #### 步骤5: 模型预测
+
 - 勾选"载入最佳模型进行预测"
 - 上传预测数据文件
 - 获取预测结果
@@ -199,23 +215,29 @@ MLquick/
 ### 主要函数
 
 #### `classification_task(data, target_variable, train_size)`
+
 **功能**: 执行分类任务建模
 **参数**:
+
 - `data` (pd.DataFrame): 输入数据
 - `target_variable` (str): 目标变量名
 - `train_size` (float): 训练集比例
 
 **返回值**:
+
 - `best_model`: 最佳训练模型
 - `model_comparison`: 模型对比结果
 
 #### `regression_task(data, target_variable, train_size)`
+
 **功能**: 执行回归任务建模
 **参数**: 同分类任务
 
 #### `prediction(model_path, prediction_file)`
+
 **功能**: 使用已训练模型进行预测
 **参数**:
+
 - `model_path` (str): 模型文件路径
 - `prediction_file`: 预测数据文件
 
@@ -224,7 +246,9 @@ MLquick/
 项目提供了两个样例数据文件，位于 `data/samples/` 目录：
 
 ### 1. 分类任务数据 (`classification_sample.csv`)
+
 **场景**: 客户购买行为预测
+
 - **样本数量**: 500条
 - **特征数量**: 6个特征
 - **目标变量**: `purchase_category` (购买类别)
@@ -233,6 +257,7 @@ MLquick/
   - Clothing (服装)
 
 **特征说明**:
+
 - `age`: 年龄
 - `income`: 收入
 - `education_level`: 教育水平
@@ -241,6 +266,7 @@ MLquick/
 - `marital_status`: 婚姻状况
 
 **使用方法**:
+
 1. 上传 `data/samples/classification_sample.csv` 文件
 2. 选择任务类型为"分类"
 3. 选择目标变量为 `purchase_category`
@@ -248,12 +274,15 @@ MLquick/
 5. 点击"训练模型"
 
 ### 2. 回归任务数据 (`regression_sample.csv`)
+
 **场景**: 房价预测
+
 - **样本数量**: 400条
 - **特征数量**: 11个特征
 - **目标变量**: `price_in_thousands` (房价，单位：千美元)
 
 **特征说明**:
+
 - `house_age`: 房屋年龄
 - `square_feet`: 面积（平方英尺）
 - `num_bedrooms`: 卧室数量
@@ -267,6 +296,7 @@ MLquick/
 - `year_built`: 建造年份
 
 **使用方法**:
+
 1. 上传 `data/samples/regression_sample.csv` 文件
 2. 选择任务类型为"回归"
 3. 选择目标变量为 `price_in_thousands`
@@ -274,12 +304,15 @@ MLquick/
 5. 点击"训练模型"
 
 ### 3. 聚类任务数据 (`clustering_sample.csv`)
+
 **场景**: 客户细分分析
+
 - **样本数量**: 200条
 - **特征数量**: 10个数值特征
 - **任务类型**: 无监督聚类分析
 
 **特征说明**:
+
 - `age`: 年龄
 - `income`: 年收入
 - `spending_score`: 消费评分 (0-100)
@@ -292,6 +325,7 @@ MLquick/
 - `loyalty_points`: 会员积分
 
 **使用方法**:
+
 1. 上传 `data/samples/clustering_sample.csv` 文件
 2. 选择任务类型为"聚类"
 3. 设置聚类数量（推荐3-5个）
@@ -299,11 +333,13 @@ MLquick/
 5. 点击"训练模型"
 
 **预期聚类结果**:
+
 - 聚类0: 高收入高消费的优质客户
 - 聚类1: 中等收入的稳定客户
 - 聚类2: 年轻的低消费客户
 
 ### 快速开始示例
+
 ```python
 # 加载分类样例数据
 import pandas as pd
@@ -319,21 +355,27 @@ data = pd.read_csv('data/samples/clustering_sample.csv')
 ## ❓ 常见问题
 
 ### Q1: 支持哪些数据格式？
+
 A: 目前支持CSV和Excel格式，确保文件编码为UTF-8。
 
 ### Q2: 训练时间很长怎么办？
+
 A: 可以通过减少训练集比例或选择特定算法来缩短训练时间。
 
 ### Q3: 如何提高模型性能？
+
 A:
+
 - 确保数据质量，处理缺失值和异常值
 - 尝试不同的训练集比例
 - 进行特征工程和特征选择
 
 ### Q4: 模型文件保存在哪里？
+
 A: 模型文件自动保存在项目根目录，文件名为`best_classification_model.pkl`或`best_regression_model.pkl`。
 
 ### Q5: 可以保存预测结果吗？
+
 A: 可以在界面上选择下载预测结果为CSV文件。
 
 ## 🤝 贡献指南
@@ -341,6 +383,7 @@ A: 可以在界面上选择下载预测结果为CSV文件。
 我们欢迎所有形式的贡献！
 
 ### 开发流程
+
 1. Fork 项目
 2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
@@ -348,13 +391,16 @@ A: 可以在界面上选择下载预测结果为CSV文件。
 5. 创建 Pull Request
 
 ### 代码规范
+
 - 遵循PEP 8编码规范
 - 添加适当的注释和文档字符串
 - 编写单元测试
 - 确保代码通过所有测试
 
 ### 问题报告
+
 使用GitHub Issues报告问题，请包含：
+
 - 详细的错误描述
 - 重现步骤
 - 环境信息

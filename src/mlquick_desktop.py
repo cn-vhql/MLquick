@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import sys
 from datetime import datetime
@@ -99,6 +99,9 @@ def configure_table(table: QTableWidget) -> None:
     table.setAlternatingRowColors(True)
     table.setSelectionBehavior(QAbstractItemView.SelectRows)
     table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    table.setWordWrap(False)
+    table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+    table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
     table.verticalHeader().setVisible(False)
     table.horizontalHeader().setStretchLastSection(True)
     table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -200,6 +203,7 @@ class DesktopMainWindow(QMainWindow):
         self.history_records: list[str] = []
         self._no_wheel_widgets: set[QWidget] = set()
         self._current_plot_path: Path | None = None
+        self._has_training_plots = False
         self.app_mode: str = "train"
 
         self.setWindowTitle("MLquick 桌面版")
@@ -239,9 +243,9 @@ class DesktopMainWindow(QMainWindow):
                 color: #141413;
             }
             QPushButton {
-                min-height: 36px;
-                min-width: 120px;
-                padding: 8px 14px;
+                min-height: 34px;
+                min-width: 104px;
+                padding: 6px 12px;
                 border-radius: 10px;
                 background: #e8e6dc;
                 border: 1px solid #d1cfc5;
@@ -292,6 +296,20 @@ class DesktopMainWindow(QMainWindow):
             }
             QPushButton[modeSwitch="true"]:checked:hover {
                 background: #d97757;
+            }
+            QPushButton[compact="true"] {
+                min-height: 30px;
+                min-width: 84px;
+                padding: 5px 10px;
+                border-radius: 9px;
+                font-size: 14px;
+            }
+            QPushButton[resultAction="true"] {
+                min-height: 30px;
+                min-width: 132px;
+                padding: 5px 10px;
+                border-radius: 9px;
+                font-size: 14px;
             }
             QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
                 border: 1px solid #e8e6dc;
@@ -400,8 +418,11 @@ class DesktopMainWindow(QMainWindow):
                 color: #4d4c48;
                 border: none;
                 border-right: 1px solid #e8e6dc;
-                padding: 6px 8px;
+                padding: 5px 7px;
                 font-weight: 500;
+            }
+            QTableWidget::item {
+                padding: 2px 4px;
             }
             """
         )
@@ -427,7 +448,7 @@ class DesktopMainWindow(QMainWindow):
         left_layout.setContentsMargins(4, 4, 4, 4)
         left_layout.setSpacing(10)
         left_scroll.setWidget(left_panel)
-        left_scroll.setMinimumWidth(400)
+        left_scroll.setMinimumWidth(372)
 
         brand_header = QWidget()
         brand_header_layout = QHBoxLayout(brand_header)
@@ -488,6 +509,9 @@ class DesktopMainWindow(QMainWindow):
 
         self.load_button = QPushButton("导入数据集")
         self.load_button.setProperty("variant", "primary")
+        self.load_button.setProperty("compact", "true")
+        self.load_button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.load_button.setFixedWidth(116)
         self.load_button.clicked.connect(self.load_dataset_file)
         left_layout.addWidget(self.load_button)
 
@@ -630,10 +654,16 @@ class DesktopMainWindow(QMainWindow):
         feature_actions_layout.setSpacing(8)
         self.select_all_features_button = QPushButton("全选")
         self.select_all_features_button.setProperty("variant", "secondary")
+        self.select_all_features_button.setProperty("compact", "true")
+        self.select_all_features_button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.select_all_features_button.setFixedWidth(116)
         self.select_all_features_button.clicked.connect(lambda: self.set_all_features_checked(True))
         feature_actions_layout.addWidget(self.select_all_features_button)
         self.clear_features_button = QPushButton("清空")
         self.clear_features_button.setProperty("variant", "secondary")
+        self.clear_features_button.setProperty("compact", "true")
+        self.clear_features_button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.clear_features_button.setFixedWidth(116)
         self.clear_features_button.clicked.connect(lambda: self.set_all_features_checked(False))
         feature_actions_layout.addWidget(self.clear_features_button)
         feature_actions_layout.addStretch(1)
@@ -647,6 +677,9 @@ class DesktopMainWindow(QMainWindow):
         advanced_layout.setSpacing(10)
         self.use_recommended_button = QPushButton("应用推荐配置")
         self.use_recommended_button.setProperty("variant", "secondary")
+        self.use_recommended_button.setProperty("compact", "true")
+        self.use_recommended_button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.use_recommended_button.setFixedWidth(116)
         self.use_recommended_button.clicked.connect(self.apply_recommended_config)
         self.use_recommended_button.setVisible(False)
         advanced_layout.addRow("", self.use_recommended_button)
@@ -655,6 +688,9 @@ class DesktopMainWindow(QMainWindow):
 
         train_button = QPushButton("开始训练")
         train_button.setProperty("variant", "primary")
+        train_button.setProperty("compact", "true")
+        train_button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        train_button.setFixedWidth(116)
         train_button.clicked.connect(self.start_training)
         self.train_button = train_button
         config_layout.addRow("", train_button)
@@ -690,6 +726,8 @@ class DesktopMainWindow(QMainWindow):
 
         predict_button = QPushButton("使用选中模型批量预测")
         predict_button.setProperty("variant", "secondary")
+        predict_button.setProperty("compact", "true")
+        predict_button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         predict_button.clicked.connect(self.run_prediction_for_selected_model)
         self.predict_button = predict_button
         models_layout.addWidget(predict_button)
@@ -702,10 +740,14 @@ class DesktopMainWindow(QMainWindow):
 
         delete_button = QPushButton("删除选中模型")
         delete_button.setProperty("variant", "danger")
+        delete_button.setProperty("compact", "true")
+        delete_button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         delete_button.clicked.connect(self.delete_selected_model)
         models_layout.addWidget(delete_button)
         for button in left_panel.findChildren(QPushButton):
-            button.setMinimumWidth(88)
+            if button.property("modeSwitch") == "true":
+                continue
+            button.setMinimumWidth(78)
         left_layout.addWidget(self.models_box)
         left_layout.addStretch(1)
 
@@ -732,8 +774,8 @@ class DesktopMainWindow(QMainWindow):
         results_tab_layout.addWidget(results_scroll)
         results_content = QWidget()
         results_layout = QVBoxLayout(results_content)
-        results_layout.setContentsMargins(8, 8, 8, 8)
-        results_layout.setSpacing(10)
+        results_layout.setContentsMargins(6, 6, 6, 6)
+        results_layout.setSpacing(8)
         results_scroll.setWidget(results_content)
 
         self.summary_card = QFrame()
@@ -776,15 +818,19 @@ class DesktopMainWindow(QMainWindow):
         result_actions_layout.setVerticalSpacing(8)
         self.export_result_button = QPushButton("导出当前结果")
         self.export_result_button.setProperty("variant", "secondary")
-        self.export_result_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.export_result_button.setProperty("resultAction", "true")
+        self.export_result_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.export_result_button.setFixedWidth(148)
         self.export_result_button.clicked.connect(self.export_current_results)
         result_actions_layout.addWidget(self.export_result_button, 0, 0)
         self.open_workspace_button = QPushButton("打开工作区目录")
         self.open_workspace_button.setProperty("variant", "secondary")
-        self.open_workspace_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.open_workspace_button.setProperty("resultAction", "true")
+        self.open_workspace_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.open_workspace_button.setFixedWidth(148)
         self.open_workspace_button.clicked.connect(self.open_workspace_directory)
-        result_actions_layout.addWidget(self.open_workspace_button, 1, 0)
-        result_actions_layout.setColumnStretch(0, 1)
+        result_actions_layout.addWidget(self.open_workspace_button, 0, 1)
+        result_actions_layout.setColumnStretch(2, 1)
         summary_card_layout.addWidget(result_actions)
 
         next_actions = QFrame()
@@ -803,15 +849,19 @@ class DesktopMainWindow(QMainWindow):
         next_button_layout.setVerticalSpacing(8)
         self.goto_model_button = QPushButton("导出模型文件")
         self.goto_model_button.setProperty("variant", "secondary")
-        self.goto_model_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.goto_model_button.setProperty("resultAction", "true")
+        self.goto_model_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.goto_model_button.setFixedWidth(148)
         self.goto_model_button.clicked.connect(self.export_selected_model_file)
         next_button_layout.addWidget(self.goto_model_button, 0, 0)
         self.goto_prediction_button = QPushButton("去做批量预测")
         self.goto_prediction_button.setProperty("variant", "secondary")
-        self.goto_prediction_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.goto_prediction_button.setProperty("resultAction", "true")
+        self.goto_prediction_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.goto_prediction_button.setFixedWidth(148)
         self.goto_prediction_button.clicked.connect(self.run_prediction_for_selected_model)
-        next_button_layout.addWidget(self.goto_prediction_button, 1, 0)
-        next_button_layout.setColumnStretch(0, 1)
+        next_button_layout.addWidget(self.goto_prediction_button, 0, 1)
+        next_button_layout.setColumnStretch(2, 1)
         next_actions_layout.addWidget(next_button_row)
         summary_card_layout.addWidget(next_actions)
 
@@ -819,9 +869,15 @@ class DesktopMainWindow(QMainWindow):
         summary_card_layout.addWidget(self.summary_empty_label)
         self.summary_text = QPlainTextEdit()
         self.summary_text.setReadOnly(True)
-        self.summary_text.setMaximumHeight(120)
+        self.summary_text.setMaximumHeight(104)
         summary_card_layout.addWidget(self.summary_text)
         results_layout.addWidget(self.summary_card)
+
+        self.results_detail_tabs = QTabWidget()
+        self.results_detail_tabs.setDocumentMode(True)
+        self.results_detail_tabs.setMinimumHeight(560)
+        self.results_detail_tabs.tabBar().installEventFilter(self)
+        self._no_wheel_widgets.add(self.results_detail_tabs.tabBar())
 
         self.comparison_card = QFrame()
         self.comparison_card.setProperty("card", "true")
@@ -833,8 +889,9 @@ class DesktopMainWindow(QMainWindow):
         comparison_layout.addWidget(self.comparison_empty_label)
         self.result_table = QTableWidget()
         configure_table(self.result_table)
+        self.result_table.setMinimumHeight(220)
         comparison_layout.addWidget(self.result_table)
-        results_layout.addWidget(self.comparison_card, 2)
+        self.results_detail_tabs.addTab(self.comparison_card, "模型对比")
 
         self.detail_card = QFrame()
         self.detail_card.setProperty("card", "true")
@@ -845,10 +902,24 @@ class DesktopMainWindow(QMainWindow):
         detail_layout.addWidget(self.detail_section_label)
         self.detail_empty_label = create_hint_label("聚类统计、样本预览或预测附加结果会显示在这里。")
         detail_layout.addWidget(self.detail_empty_label)
+        detail_controls = QWidget()
+        detail_controls_layout = QHBoxLayout(detail_controls)
+        detail_controls_layout.setContentsMargins(0, 0, 0, 0)
+        detail_controls_layout.setSpacing(8)
+        detail_controls_layout.addStretch(1)
+        detail_controls_layout.addWidget(QLabel("预览高度"))
+        self.detail_height_spin = QSpinBox()
+        self.detail_height_spin.setRange(360, 1600)
+        self.detail_height_spin.setSingleStep(40)
+        self.detail_height_spin.setValue(640)
+        self.detail_height_spin.valueChanged.connect(self.apply_detail_height)
+        detail_controls_layout.addWidget(self.detail_height_spin)
+        detail_layout.addWidget(detail_controls)
         self.cluster_table = QTableWidget()
+        self.cluster_table.setMinimumHeight(640)
         configure_table(self.cluster_table)
         detail_layout.addWidget(self.cluster_table)
-        results_layout.addWidget(self.detail_card, 2)
+        self.results_detail_tabs.addTab(self.detail_card, "测试集预览")
 
         self.plot_card = QFrame()
         self.plot_card.setProperty("card", "true")
@@ -884,7 +955,9 @@ class DesktopMainWindow(QMainWindow):
         self.plot_image_label.setWordWrap(True)
         self.plot_image_scroll.setWidget(self.plot_image_label)
         plot_layout.addWidget(self.plot_image_scroll)
-        results_layout.addWidget(self.plot_card, 2)
+        self.results_detail_tabs.addTab(self.plot_card, "训练图表")
+        results_layout.addSpacing(4)
+        results_layout.addWidget(self.results_detail_tabs, 1)
         self.right_tabs.addTab(self.results_tab, "训练结果")
 
         self.predict_results_tab = QWidget()
@@ -983,7 +1056,7 @@ class DesktopMainWindow(QMainWindow):
         logs_layout.addWidget(self.log_text)
         self.right_tabs.addTab(self.logs_tab, "运行日志")
 
-        splitter.setSizes([420, 780])
+        splitter.setSizes([390, 790])
         self.disable_config_wheel_adjustment()
         self._set_config_row_visible("recommendation", False)
         self.toggle_task_inputs(self.task_combo.currentIndex())
@@ -992,6 +1065,7 @@ class DesktopMainWindow(QMainWindow):
         self.update_profile_stat_cards()
         self.update_training_plots([])
         self.apply_plot_height(self.plot_height_spin.value())
+        self.apply_detail_height(self.detail_height_spin.value())
         self.update_model_detail_cards()
         self.update_history_panel()
         self.set_app_mode("train")
@@ -1024,21 +1098,46 @@ class DesktopMainWindow(QMainWindow):
 
         if is_train:
             self.summary_card.setVisible(True)
-            self.plot_card.setVisible(True)
-            self.comparison_card.setVisible(self.current_task_type() != "clustering")
-            self.detail_card.setVisible(True)
+            self.results_detail_tabs.setVisible(True)
+            self.update_training_result_tabs()
         else:
             # Prediction mode is fully decoupled from training result panels.
             self.summary_card.setVisible(False)
-            self.plot_card.setVisible(False)
-            self.comparison_card.setVisible(False)
-            self.detail_card.setVisible(False)
+            self.results_detail_tabs.setVisible(False)
 
         self.right_tabs.setTabVisible(self.right_tabs.indexOf(self.preview_tab), is_train)
         self.right_tabs.setTabVisible(self.right_tabs.indexOf(self.results_tab), is_train)
         self.right_tabs.setTabVisible(self.right_tabs.indexOf(self.model_tab), is_train)
         self.right_tabs.setTabVisible(self.right_tabs.indexOf(self.predict_results_tab), not is_train)
         self.right_tabs.setCurrentWidget(self.results_tab if is_train else self.predict_results_tab)
+
+    def update_training_result_tabs(self, task_type: str | None = None) -> None:
+        if not hasattr(self, "results_detail_tabs"):
+            return
+
+        current_task = task_type or self.current_task_type()
+        comparison_index = self.results_detail_tabs.indexOf(self.comparison_card)
+        detail_index = self.results_detail_tabs.indexOf(self.detail_card)
+        plot_index = self.results_detail_tabs.indexOf(self.plot_card)
+        comparison_visible = current_task != "clustering"
+        plot_visible = self._has_training_plots
+
+        if comparison_index >= 0:
+            self.results_detail_tabs.setTabVisible(comparison_index, comparison_visible)
+        if detail_index >= 0:
+            self.results_detail_tabs.setTabVisible(detail_index, True)
+            self.results_detail_tabs.setTabText(detail_index, "聚类结果" if current_task == "clustering" else "测试集预览")
+        if plot_index >= 0:
+            self.results_detail_tabs.setTabVisible(plot_index, plot_visible)
+
+        current_widget = self.results_detail_tabs.currentWidget()
+        current_invalid = (
+            current_widget is None
+            or (current_widget is self.comparison_card and not comparison_visible)
+            or (current_widget is self.plot_card and not plot_visible)
+        )
+        if current_invalid:
+            self.results_detail_tabs.setCurrentWidget(self.detail_card if not comparison_visible else self.comparison_card)
 
     def append_log(self, message: str) -> None:
         self.log_text.appendPlainText(message)
@@ -1096,6 +1195,11 @@ class DesktopMainWindow(QMainWindow):
         self.plot_image_scroll.setMinimumHeight(max(220, int(height) + 24))
         if self._current_plot_path is not None:
             self.show_selected_training_plot()
+
+    def apply_detail_height(self, height: int) -> None:
+        target_height = max(320, int(height))
+        self.cluster_table.setMinimumHeight(target_height)
+        self.detail_card.setMinimumHeight(target_height + 104)
 
     def disable_config_wheel_adjustment(self) -> None:
         widgets: list[QWidget] = []
@@ -1291,6 +1395,7 @@ class DesktopMainWindow(QMainWindow):
         self.refresh_manual_model_options(task_type)
         self.cluster_spin.setEnabled(clustering)
         self.refresh_feature_options()
+        self.update_training_result_tabs(task_type)
 
     def refresh_feature_options(self) -> None:
         self.feature_list.clear()
@@ -1458,6 +1563,7 @@ class DesktopMainWindow(QMainWindow):
         for path in valid_paths:
             self.plot_selector.addItem(path.stem, str(path))
 
+        self._has_training_plots = bool(valid_paths)
         self.plot_selector.setEnabled(bool(valid_paths))
         self.plot_selector.blockSignals(False)
         if valid_paths:
@@ -1466,6 +1572,7 @@ class DesktopMainWindow(QMainWindow):
         else:
             self.plot_image_label.setPixmap(QPixmap())
             self.plot_image_label.setText("暂无图表")
+        self.update_training_result_tabs()
         self.update_empty_states()
 
     def show_selected_training_plot(self) -> None:
@@ -1591,6 +1698,7 @@ class DesktopMainWindow(QMainWindow):
         self.update_training_plots([])
         self.detail_section_label.setText("辅助结果")
         self.last_export_frame = None
+        self.update_training_result_tabs(config.task_type)
         self.update_metric_cards()
         self.update_empty_states()
         self.append_log("开始训练模型...")
@@ -1607,7 +1715,6 @@ class DesktopMainWindow(QMainWindow):
 
     def handle_training_completed(self, result: TrainingResult) -> None:
         is_clustering = result.metadata.task_type == "clustering"
-        self.comparison_card.setVisible(not is_clustering)
         self.update_metric_cards(result.metadata.task_type, result.metadata.metrics)
         self.summary_text.setPlainText("\n".join(result.summary_lines))
         self.update_training_plots(result.plot_paths)
@@ -1622,7 +1729,19 @@ class DesktopMainWindow(QMainWindow):
         else:
             self.detail_section_label.setText("结果预览")
         dataframe_to_table(self.cluster_table, cluster_data)
-        self.last_export_frame = result.comparison if result.comparison is not None and not result.comparison.empty else cluster_data
+        self.update_training_result_tabs(result.metadata.task_type)
+        if result.predictions_preview is not None and not result.predictions_preview.empty:
+            self.results_detail_tabs.setCurrentWidget(self.detail_card)
+        elif result.comparison is not None and not result.comparison.empty and not is_clustering:
+            self.results_detail_tabs.setCurrentWidget(self.comparison_card)
+        elif result.plot_paths:
+            self.results_detail_tabs.setCurrentWidget(self.plot_card)
+        if result.predictions_preview is not None and not result.predictions_preview.empty:
+            self.last_export_frame = result.predictions_preview
+        elif cluster_data is not None and not cluster_data.empty:
+            self.last_export_frame = cluster_data
+        else:
+            self.last_export_frame = result.comparison
         self.append_log(f"训练完成: {result.metadata.model_name}")
         self.training_status_label.setText("当前状态: 训练完成")
         self.training_progress.setValue(100)

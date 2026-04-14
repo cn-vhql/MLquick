@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime
 import os
@@ -521,18 +521,24 @@ class TrainingService:
         if predicted_column is None or target_column not in holdout_predictions.columns:
             return None
 
-        preview = pd.DataFrame(
-            {
-                "实际值": holdout_predictions[target_column],
-                "预测值": holdout_predictions[predicted_column],
-            }
-        )
+        auxiliary_columns = {
+            "prediction_label",
+            "Label",
+            "prediction",
+            "Predicted",
+            "prediction_score",
+            "Score",
+            "prediction_score_1",
+        }
+        base_columns = [column for column in holdout_predictions.columns if column not in auxiliary_columns]
+        preview = holdout_predictions.loc[:, base_columns].copy()
+        preview["prediction_value"] = holdout_predictions[predicted_column]
         if task_type == "classification":
             for score_col in ("prediction_score", "Score", "prediction_score_1"):
                 if score_col in holdout_predictions.columns:
-                    preview["预测置信度"] = holdout_predictions[score_col]
+                    preview["prediction_score"] = holdout_predictions[score_col]
                     break
-        return preview.head(100)
+        return preview
 
     def _extract_summary_row(self, metrics_table: pd.DataFrame) -> pd.Series:
         if metrics_table is None or metrics_table.empty:
@@ -545,3 +551,4 @@ class TrainingService:
             if not std_rows.empty:
                 return std_rows.iloc[0]
         return metrics_table.iloc[-1]
+
