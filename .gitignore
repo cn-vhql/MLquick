@@ -2,7 +2,13 @@
 __pycache__/
 *.py[cod]
 *$py.class
-MLquick-GUI/
+MLquick-GUI
+CLAUDE.md
+hooks
+run.py
+test_output
+test_reports
+.claude
 
 # C extensions
 *.so
@@ -33,6 +39,7 @@ MANIFEST
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+!MLquickDesktop.spec
 
 # Installer logs
 pip-log.txt
@@ -217,3 +224,11 @@ pycaret_log/
 *.temp
 *.bak
 *.backup
+pyproject.toml
+hooks/hook-streamlit.py
+workspace/
+test_workspace/
+test_workspace_gui/
+metric_check_workspace/
+logs.log
+tmp_*.pkl

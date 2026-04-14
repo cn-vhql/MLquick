@@ -116,6 +116,35 @@ class TrainingService:
             return max(2, min(fold_by_rows, min_class_count))
         return max(2, fold_by_rows)
 
+    def _resolve_classification_split(
+        self,
+        data: pd.DataFrame,
+        target_column: str | None,
+        requested_train_size: float,
+    ) -> tuple[float, bool]:
+        if not target_column or target_column not in data.columns:
+            raise ValueError("分类任务缺少有效目标列。")
+        n_rows = len(data)
+        class_count = int(data[target_column].nunique(dropna=False))
+        if n_rows < 2:
+            raise ValueError("样本量过少，无法进行分类训练。")
+
+        train_size = float(requested_train_size)
+        train_size = max(0.1, min(0.95, train_size))
+
+        # Prefer stratified split with integer-safe adjustment so both train/test
+        # can contain all classes when feasible.
+        min_rows_per_split = class_count
+        if n_rows >= min_rows_per_split * 2:
+            desired_test_rows = int(round((1.0 - train_size) * n_rows))
+            desired_test_rows = max(min_rows_per_split, desired_test_rows)
+            desired_test_rows = min(desired_test_rows, n_rows - min_rows_per_split)
+            adjusted_train_size = 1.0 - (desired_test_rows / n_rows)
+            return max(0.1, min(0.95, adjusted_train_size)), True
+
+        # Not enough samples to guarantee both splits cover all classes.
+        return max(0.5, train_size), False
+
     def _generate_plot_images(
         self,
         plot_model,
@@ -178,6 +207,11 @@ class TrainingService:
         )
 
         prepared = self._prepare_supervised_data(data, config)
+        effective_train_size, use_stratify = self._resolve_classification_split(
+            prepared,
+            config.target_column,
+            config.train_size,
+        )
         fold_count = self._resolve_supervised_fold(prepared, config.target_column, "classification")
         self._emit(progress, "正在初始化分类训练环境...")
         setup(
@@ -185,7 +219,9 @@ class TrainingService:
             target=config.target_column,
             session_id=123,
             normalize=True,
-            train_size=config.train_size,
+            train_size=effective_train_size,
+            data_split_stratify=use_stratify,
+            text_features=(config.text_columns or None) if config.preprocess_text else None,
             fold=fold_count,
             verbose=False,
             n_jobs=1,
@@ -198,11 +234,15 @@ class TrainingService:
             config=config,
             progress=progress,
         )
-        preview = self._build_supervised_preview(
-            holdout_predictions=predict_model(model),
-            target_column=config.target_column,
-            task_type="classification",
-        )
+        preview = None
+        try:
+            preview = self._build_supervised_preview(
+                holdout_predictions=predict_model(model),
+                target_column=config.target_column,
+                task_type="classification",
+            )
+        except Exception as exc:
+            self._emit(progress, f"测试集预测预览生成失败，已跳过: {exc}")
         model = finalize_model(model)
 
         model_name = self.registry.generate_model_name("classification")
@@ -232,7 +272,7 @@ class TrainingService:
             f"目标列：{config.target_column}",
             f"训练策略：{train_mode_text}",
             f"交叉验证折数：{fold_count}",
-            f"训练集比例：{config.train_size:.0%}",
+            f"训练集比例：{effective_train_size:.0%}",
             f"参与训练字段数：{len(metadata.feature_columns)}",
         ]
         if metadata.metrics:
@@ -272,6 +312,7 @@ class TrainingService:
             data=prepared,
             target=config.target_column,
             train_size=config.train_size,
+            text_features=(config.text_columns or None) if config.preprocess_text else None,
             fold=fold_count,
             verbose=False,
             n_jobs=1,
@@ -284,11 +325,15 @@ class TrainingService:
             config=config,
             progress=progress,
         )
-        preview = self._build_supervised_preview(
-            holdout_predictions=predict_model(model),
-            target_column=config.target_column,
-            task_type="regression",
-        )
+        preview = None
+        try:
+            preview = self._build_supervised_preview(
+                holdout_predictions=predict_model(model),
+                target_column=config.target_column,
+                task_type="regression",
+            )
+        except Exception as exc:
+            self._emit(progress, f"测试集预测预览生成失败，已跳过: {exc}")
         model = finalize_model(model)
 
         model_name = self.registry.generate_model_name("regression")
@@ -420,7 +465,17 @@ class TrainingService:
             try:
                 model = create_model(config.manual_model_id, verbose=False)
             except Exception as exc:
-                raise ValueError(f"指定模型不可用或依赖缺失: {config.manual_model_id} ({exc})") from exc
+                message = str(exc)
+                split_errors = (
+                    "n_splits",
+                    "number of members in each class",
+                    "Cannot have number of splits",
+                )
+                if any(token in message for token in split_errors):
+                    self._emit(progress, "样本过小，交叉验证自动降级为禁用后重试。")
+                    model = create_model(config.manual_model_id, verbose=False, cross_validation=False)
+                else:
+                    raise ValueError(f"指定模型不可用或依赖缺失: {config.manual_model_id} ({exc})") from exc
             metrics_table = self._normalize_comparison_table(pull())
             summary_row = self._extract_summary_row(metrics_table)
             comparison = pd.DataFrame([summary_row.to_dict()])

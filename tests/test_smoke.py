@@ -50,7 +50,7 @@ class SmokeTests(unittest.TestCase):
 
     def test_classification_train_predict(self) -> None:
         data = load_dataset(ROOT / "data" / "samples" / "classification_sample.csv")
-        target = "purchase_category"
+        target = "target"
         config = TrainingConfig(
             task_type="classification",
             target_column=target,
@@ -105,7 +105,7 @@ class SmokeTests(unittest.TestCase):
         try:
             window = mlquick_desktop.DesktopMainWindow()
             self.assertEqual(window.windowTitle(), "MLquick 桌面版")
-            self.assertEqual(window.right_tabs.count(), 4)
+            self.assertEqual(window.right_tabs.count(), 5)
             self.assertEqual(window.model_filter_combo.count(), 4)
             window.close()
         finally:
