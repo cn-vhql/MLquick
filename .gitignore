@@ -232,3 +232,5 @@ test_workspace_gui/
 metric_check_workspace/
 logs.log
 tmp_*.pkl
+DESIGN.md
+DESIGN.md

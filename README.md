@@ -2,8 +2,6 @@
 
 MLquick 是一个面向业务人员的零代码机器学习桌面产品，聚焦分类、回归、聚类三类常见分析任务，帮助用户在不写代码的前提下完成数据导入、模型训练、效果对比、批量预测和结果导出。
 
-当前产品主形态为 `PySide6 + PyCaret` 的 Windows 桌面端，版本为 `0.0.3`。
-
 ## 产品介绍
 
 MLquick 的目标不是做一个面向算法工程师的实验平台，而是做一个让业务分析、运营、风控、销售支持、产品分析等角色也能直接上手的建模工具。
@@ -208,43 +206,6 @@ uv pip install -r requirements.txt
 ```powershell
 .\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean MLquickDesktop.spec
 ```
-
-当前 `0.0.3` 单文件 exe 产物位于：
-
-- `dist/MLquickDesktop.exe`
-- `dist/MLquickDesktop-0.0.3.exe`
-
-### 是否可以使用 GitHub 构建工具构建发行包
-
-可以。
-
-当前项目非常适合使用 GitHub Actions 做自动化发行，典型流程是：
-
-1. 在 `windows-latest` runner 上拉取仓库
-2. 安装 Python 与 `uv`
-3. 安装依赖
-4. 执行 PyInstaller 构建单文件 exe
-5. 上传为 Actions Artifact
-6. 在打 tag 时自动创建 GitHub Release 并附带 exe
-
-这类方案的优点是：
-
-- 不依赖本地开发机手动打包
-- 每个版本的构建过程可追溯
-- 可以和 tag / release 流程绑定
-- 方便后续做多版本、自动发布、校验和产物留档
-
-如果你要，我下一步可以直接给这个仓库补一套 `.github/workflows/release.yml`。
-
-## 示例数据
-
-示例数据位于 `data/samples/`，可直接用于训练与验证：
-
-- 分类样例
-- 回归样例
-- 聚类样例
-- 文本分类样例
-- 文本回归样例
 
 ## 致谢
 
