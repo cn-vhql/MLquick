@@ -1,0 +1,120 @@
+name: Build And Release MLquick Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install uv
+
+      - name: Resolve Version
+        id: version
+        shell: pwsh
+        run: |
+          $content = Get-Content -Path "src/__init__.py" -Raw -Encoding UTF8
+          if ($content -notmatch '__version__\s*=\s*"([^"]+)"') {
+            throw "Cannot resolve __version__ from src/__init__.py"
+          }
+
+          $version = $matches[1]
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "exe_name=MLquickDesktop-$version.exe" >> $env:GITHUB_OUTPUT
+          "zip_name=MLquickDesktop-$version-windows-x64.zip" >> $env:GITHUB_OUTPUT
+          "sha_name=MLquickDesktop-$version-windows-x64.sha256" >> $env:GITHUB_OUTPUT
+
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $tagVersion = "${{ github.ref_name }}" -replace '^v', ''
+            if ($tagVersion -ne $version) {
+              throw "Git tag version ($tagVersion) does not match src/__init__.py version ($version)."
+            }
+          }
+
+      - name: Create Virtual Environment
+        shell: pwsh
+        run: |
+          uv venv .venv
+
+      - name: Install Dependencies
+        shell: pwsh
+        run: |
+          uv pip install --python .\.venv\Scripts\python.exe -r requirements.txt
+
+      - name: Smoke Test Desktop Initialization
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\python.exe -m unittest tests.test_smoke.SmokeTests.test_desktop_initialization -v
+
+      - name: Build Single File EXE
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean MLquickDesktop.spec
+
+      - name: Package Release Files
+        id: package
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $rawExe = "dist/MLquickDesktop.exe"
+          $versionedExe = "dist/${{ steps.version.outputs.exe_name }}"
+          $zipPath = "dist/${{ steps.version.outputs.zip_name }}"
+          $shaPath = "dist/${{ steps.version.outputs.sha_name }}"
+
+          if (-not (Test-Path $rawExe)) {
+            throw "Expected build output not found: $rawExe"
+          }
+
+          Copy-Item -LiteralPath $rawExe -Destination $versionedExe -Force
+          if (Test-Path $zipPath) {
+            Remove-Item -LiteralPath $zipPath -Force
+          }
+          Compress-Archive -Path $versionedExe -DestinationPath $zipPath -Force
+
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash.ToLower()
+          "$hash  $([System.IO.Path]::GetFileName($zipPath))" | Set-Content -Path $shaPath -Encoding ascii
+
+          "release_zip=$zipPath" >> $env:GITHUB_OUTPUT
+          "release_exe=$versionedExe" >> $env:GITHUB_OUTPUT
+          "release_sha=$shaPath" >> $env:GITHUB_OUTPUT
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlquick-desktop-${{ steps.version.outputs.version }}-windows
+          path: |
+            ${{ steps.package.outputs.release_exe }}
+            ${{ steps.package.outputs.release_zip }}
+            ${{ steps.package.outputs.release_sha }}
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: MLquick ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            ${{ steps.package.outputs.release_exe }}
+            ${{ steps.package.outputs.release_zip }}
+            ${{ steps.package.outputs.release_sha }}
